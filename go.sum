@@ -1,0 +1,6 @@
+github.com/jordan-wright/email v0.0.0-20210109023952-943e75fe5223 h1:QiwF4D/5BpGJysOwessRAabllHCcqC9vM/aQRstZBdM=
+github.com/jordan-wright/email v0.0.0-20210109023952-943e75fe5223/go.mod h1:1c7szIrayyPPB/987hsnvNzLushdWf4o/79s3P08L8A=
+github.com/xgfone/cast v0.5.1 h1:m9d/iTkTp0f8XEG162mPQNLlDoJWSKrIV7fbkEgIPMg=
+github.com/xgfone/cast v0.5.1/go.mod h1:T+gPbsD/fD72zz9wy/XaLTv236sPHaf6TcT7uvIhV/k=
+github.com/xgfone/sqlx v0.21.0 h1:VcxEAxeoJ5r0KNwen/BAwzwM8ILZznXUMxqJiU3PRlQ=
+github.com/xgfone/sqlx v0.21.0/go.mod h1:vvYPtjyXubisjgYuNf6e+ro4SVsQDpNS70fCDwar8vg=
