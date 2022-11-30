@@ -79,6 +79,15 @@ func NewChannel(channelName, driverName string, driverConf map[string]interface{
 	}, nil
 }
 
+// MustNewChannel returns a new channel and panics if there is an error.
+func MustNewChannel(channelName, driverName string, driverConf map[string]interface{}) *Channel {
+	channel, err := NewChannel(channelName, driverName, driverConf)
+	if err != nil {
+		panic(err)
+	}
+	return channel
+}
+
 func (c *Channel) String() string {
 	if c.ChannelName == "" {
 		return fmt.Sprintf("Channel(driver=%s)", c.DriverName)
