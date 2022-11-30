@@ -152,6 +152,8 @@ func (m *Manager) BuildAndUpsertChannels(channels ...channel.Channel) error {
 		if err != nil {
 			return err
 		}
+
+		_ch.IsDefault = ch.IsDefault
 		_channels[i] = _ch
 	}
 
