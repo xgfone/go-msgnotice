@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/xgfone/go-msgnotice/channel"
 	"github.com/xgfone/go-msgnotice/channel/manager"
+	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/middleware"
 	"github.com/xgfone/go-msgnotice/driver/middleware/logger"
 	"github.com/xgfone/go-msgnotice/driver/middleware/template"
@@ -34,23 +36,17 @@ var (
 	templatesfile = flag.String("templatesfile", "templates.json", "The file path storing the templates.")
 )
 
-func newChannel(cname, dname string, dconf map[string]interface{}) (*channel.Channel, error) {
-	channel, err := channel.NewChannel(cname, dname, dconf)
-	if err == nil {
-		channel.Driver = middleware.DefaultManager.WrapDriver(channel.Driver)
-	}
-	return channel, err
+func wrapDriver(_name, _type string, _driver driver.Driver) driver.Driver {
+	return driver.NewDriver(func(ctx context.Context, t, c string, md map[string]interface{}, tos ...string) error {
+		log.Printf("middleware=%s, type=%s, title=%s, content=%s, tos=%v", _name, _type, t, c, tos)
+		return _driver.Send(ctx, t, c, md, tos...)
+	}, _driver.Stop)
 }
 
-func initChannels() (err error) {
-	manager.Default.NewChannel = newChannel
-	channelStorage, err := file.NewChannelStorage(*channelsfile)
-	if err != nil {
-		return
-	}
-
-	channels, _ := channelStorage.GetChannels(context.Background(), 0, 0)
-	return manager.Default.BuildAndUpsertChannels(channels...)
+func newDriverMiddleware(_name, _type string, _prio int) middleware.Middleware {
+	return middleware.NewMiddleware(_name, _type, _prio, func(d driver.Driver) driver.Driver {
+		return wrapDriver(_name, _type, d)
+	})
 }
 
 func initDriverMiddlewares() (err error) {
@@ -59,8 +55,26 @@ func initDriverMiddlewares() (err error) {
 		return
 	}
 
-	middleware.DefaultManager.Use(logger.New(0), template.New(10, tmplStorage.GetTemplate))
+	// For Common middlewares
+	middleware.DefaultManager.Use(logger.New("", 0), template.New("", 10, tmplStorage.GetTemplate))
+
+	// Only for Email middleware
+	middleware.DefaultManager.Use(newDriverMiddleware("email", "email", 20))
+
+	// Only for Stdout middleware
+	middleware.DefaultManager.Use(newDriverMiddleware("stdout", "stdout", 20))
+
 	return nil
+}
+
+func initChannels() (err error) {
+	channelStorage, err := file.NewChannelStorage(*channelsfile)
+	if err != nil {
+		return
+	}
+
+	channels, _ := channelStorage.GetChannels(context.Background(), 0, 0)
+	return manager.Default.BuildAndUpsertChannels(channels...)
 }
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
@@ -147,10 +161,10 @@ func main() {
         "ChannelName": "email",
         "DriverName": "email",
         "DriverConf": {
-            "Addr": "mail.domain.com:25",
-            "From": "username@domain.com",
-            "Username": "username@domain.com",
-            "Password": "password"
+            "addr": "mail.domain.com:25",
+            "from": "username@domain.com",
+            "username": "username@domain.com",
+            "password": "password"
         }
     }
 ]
@@ -161,10 +175,10 @@ func main() {
 $ msgnotice &
 
 # Client sends the message.
-$ curl http://localhost/message -XPOST -H 'Content-Type: application/json'\
+$ curl http://localhost/message -XPOST -H 'Content-Type: application/json' \
 -d '{"Channel":"stdout", "Title":"title", "Content":"content", "Receivers":["someone"]}'
-$ curl http://localhost/message -XPOST -H 'Content-Type: application/json'\
+$ curl http://localhost/message -XPOST -H 'Content-Type: application/json' \
 -d '{"Channel":"email", "Title":"title", "Content":"content", "Receivers":["someone@mail.com"]}'
-$ curl http://localhost/message -XPOST -H 'Content-Type: application/json'\
+$ curl http://localhost/message -XPOST -H 'Content-Type: application/json' \
 -d '{"Channel":"email", "Title":"title", "Content":"tmpl:hello", "Metadata":{"name":"xgfone"}, "Receivers":["someone@mail.com"]}'
 ```

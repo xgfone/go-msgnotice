@@ -22,35 +22,53 @@ import (
 	"sync/atomic"
 
 	"github.com/xgfone/go-msgnotice/channel"
+	"github.com/xgfone/go-msgnotice/driver/middleware"
 )
 
 // Default is the global default channel manager.
-var Default = NewManager()
+var Default = NewManager(middleware.DefaultManager)
 
 func init() { channel.Send = Default.Send }
+
+// NewChannelFunc is a function to new a channel from the config.
+type NewChannelFunc func(channelName, driverName string, driverConf map[string]interface{}) (*channel.Channel, error)
 
 // Manager is used to manage a group of channels.
 type Manager struct {
 	// NewChannel is used to create a new channel.
 	//
 	// Default: channel.NewChannel
-	NewChannel func(channelName, driverName string, driverConf map[string]interface{}) (*channel.Channel, error)
+	NewChannel NewChannelFunc
 
-	clock sync.RWMutex
-	chmap map[string]*channel.Channel
+	// DriverMiddlewares is used to manage the middlewares of the channel drivers.
+	DriverMiddlewares *middleware.Manager
 
+	// GetDefaultChannelName is used to get the default channel name
+	// if no channel is given, which should returns ("", nil) if not found
+	// the default channel name.
+	//
+	// Default: use DefaultChannels.GetDefaultChannelName
+	GetDefaultChannelName func(c context.Context, metadata map[string]interface{}) (string, error)
+
+	clock    sync.RWMutex
+	chmap    map[string]*channel.Channel // for channels
 	channels atomic.Value
-	_default atomic.Value
 }
 
 // NewManager returns a new channel manager.
-func NewManager() *Manager {
-	m := &Manager{
-		chmap:      make(map[string]*channel.Channel, 16),
-		NewChannel: channel.NewChannel,
+//
+// If the driver middleware manager is nil, new one.
+func NewManager(driverMiddlewareManager *middleware.Manager) *Manager {
+	if driverMiddlewareManager == nil {
+		driverMiddlewareManager = middleware.NewManager(nil)
 	}
 
-	m.SetDefaultChannelName("")
+	m := &Manager{
+		chmap:             make(map[string]*channel.Channel, 16),
+		NewChannel:        channel.NewChannel,
+		DriverMiddlewares: driverMiddlewareManager,
+	}
+
 	m.updateChannels()
 	return m
 }
@@ -68,12 +86,15 @@ func (m *Manager) getChannels() map[string]*channel.Channel {
 }
 
 // AddChannel adds the channel with the name into the global cache.
+//
+// Notice: it will apply the driver middlewares to the channel driver.
 func (m *Manager) AddChannel(channel *channel.Channel) (err error) {
 	m.clock.Lock()
 	defer m.clock.Unlock()
 	if _, ok := m.chmap[channel.ChannelName]; ok {
 		err = fmt.Errorf("channel named '%s' has been added", channel.ChannelName)
 	} else {
+		channel.Driver = m.DriverMiddlewares.WrapDriverWithType(channel.DriverType, channel.Driver)
 		m.chmap[channel.ChannelName] = channel
 		m.updateChannels()
 	}
@@ -81,20 +102,15 @@ func (m *Manager) AddChannel(channel *channel.Channel) (err error) {
 	return
 }
 
-// UpsertChannel adds or updates the channel.
-func (m *Manager) UpsertChannel(channel *channel.Channel) {
-	m.clock.Lock()
-	defer m.clock.Unlock()
-	m.chmap[channel.ChannelName] = channel
-	m.updateChannels()
-}
-
 // UpsertChannels adds or updates a set of channels.
+//
+// Notice: it will apply the driver middlewares to every channel driver.
 func (m *Manager) UpsertChannels(channels ...*channel.Channel) {
 	m.clock.Lock()
 	defer m.clock.Unlock()
-	for _, channel := range channels {
-		m.chmap[channel.ChannelName] = channel
+	for _, ch := range channels {
+		ch.Driver = m.DriverMiddlewares.WrapDriverWithType(ch.DriverType, ch.Driver)
+		m.chmap[ch.ChannelName] = ch
 	}
 	m.updateChannels()
 }
@@ -118,8 +134,8 @@ func (m *Manager) GetChannel(channelName string) *channel.Channel {
 	return m.getChannels()[channelName]
 }
 
-// GetChannels returns all the channels in the global cache.
-func (m *Manager) GetChannels() []*channel.Channel {
+// GetAllChannels returns all the channels in the global cache.
+func (m *Manager) GetAllChannels() []*channel.Channel {
 	channels := m.getChannels()
 	_channels := make([]*channel.Channel, 0, len(channels))
 	for _, channel := range channels {
@@ -127,12 +143,6 @@ func (m *Manager) GetChannels() []*channel.Channel {
 	}
 	return _channels
 }
-
-// SetDefaultChannelName resets the default channel name.
-func (m *Manager) SetDefaultChannelName(name string) { m._default.Store(name) }
-
-// GetDefaultChannelName returns the default channel name.
-func (m *Manager) GetDefaultChannelName() string { return m._default.Load().(string) }
 
 // BuildAndUpsertChannels builds the channels, and add or upsert them.
 func (m *Manager) BuildAndUpsertChannels(channels ...channel.Channel) error {
@@ -151,20 +161,32 @@ func (m *Manager) BuildAndUpsertChannels(channels ...channel.Channel) error {
 
 // Send is a convenient function to look up the channel by the name
 // from the global cache and send the message with the channel.
-func (m *Manager) Send(c context.Context, channelName, title, content string, metadata map[string]interface{}, tos ...string) error {
+func (m *Manager) Send(c context.Context, channelName, title, content string,
+	metadata map[string]interface{}, receivers ...string) (err error) {
 	if channelName == "" {
-		channelName = m.GetDefaultChannelName()
+		if m.GetDefaultChannelName != nil {
+			channelName, err = m.GetDefaultChannelName(c, metadata)
+		} else {
+			channelName, err = DefaultChannels.GetDefaultChannelName(c, metadata)
+		}
+
+		if err != nil {
+			return err
+		}
 	}
 
 	if channel, ok := m.getChannels()[channelName]; ok {
-		return channel.Send(c, title, content, metadata, tos...)
+		err = channel.Send(c, title, content, metadata, receivers...)
+	} else {
+		err = fmt.Errorf("no channel named '%s'", channelName)
 	}
-	return fmt.Errorf("no channel named '%s'", channelName)
+
+	return
 }
 
 // Stop stops all the registered channels.
 func (m *Manager) Stop() {
-	for _, channel := range m.GetChannels() {
+	for _, channel := range m.GetAllChannels() {
 		channel.Stop()
 	}
 }

@@ -27,8 +27,15 @@ var (
 )
 
 // NewAndRegister news the driver builder and register it.
-func NewAndRegister(name, _type string, newDriver func(map[string]interface{}) (driver.Driver, error)) {
+func NewAndRegister(name, _type string, newDriver NewDriverFunc) {
 	Register(New(name, _type, newDriver))
+}
+
+// NewAndRegisterFromSender news the driver builder from the sender and register it.
+func NewAndRegisterFromSender(name, _type string, sender driver.Sender) {
+	Register(New(name, _type, func(map[string]interface{}) (driver.Driver, error) {
+		return sender, nil
+	}))
 }
 
 // Register registers the driver builder.

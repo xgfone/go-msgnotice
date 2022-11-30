@@ -25,12 +25,23 @@ import (
 	"github.com/xgfone/go-msgnotice/driver/middleware"
 )
 
+// Event represents a log message event.
+type Event struct {
+	Channel   *channel.Channel
+	Title     string
+	Content   string
+	Metadata  map[string]interface{}
+	Receivers []string
+	Start     time.Time
+	Err       error
+}
+
 // LogEvent is used to log the message event.
 //
 // If not set, use the default by using log.Printf.
-var LogEvent func(middleware.Event)
+var LogEvent func(Event)
 
-func logevent(e middleware.Event) {
+func logevent(e Event) {
 	if LogEvent != nil {
 		LogEvent(e)
 	} else {
@@ -45,8 +56,8 @@ func logevent(e middleware.Event) {
 }
 
 // New returns a new logger middleware to log the sent message.
-func New(priority int) middleware.Middleware {
-	return middleware.NewMiddleware("logger", priority, func(d driver.Driver) driver.Driver {
+func New(_type string, priority int) middleware.Middleware {
+	return middleware.NewMiddleware("logger", _type, priority, func(d driver.Driver) driver.Driver {
 		return &driverImpl{d}
 	})
 }
@@ -57,7 +68,7 @@ func (d *driverImpl) Send(c context.Context, title, content string,
 	metadata map[string]interface{}, tos ...string) (err error) {
 	start := time.Now()
 	err = d.Driver.Send(c, title, content, metadata, tos...)
-	logevent(middleware.Event{
+	logevent(Event{
 		Channel:   channel.GetChannelFromContext(c),
 		Title:     title,
 		Content:   content,

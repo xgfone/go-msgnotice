@@ -26,15 +26,28 @@ import (
 	"github.com/xgfone/go-msgnotice/driver/builder"
 )
 
-func init() { builder.NewAndRegister("email", "email", New) }
+// DriverType represents the driver type "email".
+const DriverType = "email"
 
-// New returns a new driver, which sends the message by the email.
+func init() { builder.NewAndRegister(DriverType, DriverType, New) }
+
+// New returns a new driver, which sends the message by the email,
+// which is registered as the driver builder with name "email"
+// and type DriverType by default.
+//
+// config options:
+//
+//	addr(string, required): the mail server address, such as "mail.examole.com:25".
+//	from(string, required): the adddress to send email, such as "username@mail.example.com".
+//	username(string, required): the username to login the mail server, such as "username@mail.example.com".
+//	password(string, required): the password to login the mail server, such as "password".
+//	forcetls(bool, optional): If true, force to use TLS.
 func New(config map[string]interface{}) (driver.Driver, error) {
-	addr, _ := config["Addr"].(string)
-	from, _ := config["From"].(string)
-	username, _ := config["Username"].(string)
-	password, _ := config["Password"].(string)
-	forceTLS, _ := config["ForceTLS"].(bool)
+	addr, _ := config["addr"].(string)
+	from, _ := config["from"].(string)
+	username, _ := config["username"].(string)
+	password, _ := config["password"].(string)
+	forceTLS, _ := config["forcetls"].(bool)
 	if addr == "" {
 		return nil, errors.New("Addr is missing or invalid")
 	}

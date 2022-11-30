@@ -46,7 +46,11 @@ func GetChannelFromContext(ctx context.Context) *Channel {
 var ErrNoChannel = errors.New("no channel")
 
 // Send is the convenient unified function to send the message.
-var Send func(c context.Context, channelName, title, content string, metadata map[string]interface{}, tos ...string) error
+//
+// Notice: it will be set to manager.Default.Send if importing the package
+// "github.com/xgfone/go-msgnotice/channel/manager",
+var Send func(c context.Context, channelName, title, content string,
+	metadata map[string]interface{}, tos ...string) error
 
 // Channel represents a channel to send the message.
 type Channel struct {
@@ -54,6 +58,7 @@ type Channel struct {
 	DriverName  string
 	DriverType  string
 	DriverConf  map[string]interface{}
+	IsDefault   bool
 
 	driver.Driver `json:"-" yaml:"-" sql:"-" xml:"-"`
 }

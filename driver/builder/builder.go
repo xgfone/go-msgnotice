@@ -24,15 +24,18 @@ type Builder interface {
 	New(config map[string]interface{}) (driver.Driver, error)
 }
 
+// NewDriverFunc is a function to new a driver.
+type NewDriverFunc func(map[string]interface{}) (driver.Driver, error)
+
 // New returns a new driver builder.
-func New(name, _type string, newDriver func(map[string]interface{}) (driver.Driver, error)) Builder {
+func New(name, _type string, newDriver NewDriverFunc) Builder {
 	return builder{name: name, typ: _type, new: newDriver}
 }
 
 type builder struct {
 	name string
 	typ  string
-	new  func(map[string]interface{}) (driver.Driver, error)
+	new  NewDriverFunc
 }
 
 func (b builder) Type() string                                        { return b.typ }

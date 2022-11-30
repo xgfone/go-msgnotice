@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"sort"
 	"time"
 
 	"github.com/xgfone/go-msgnotice/channel"
@@ -33,10 +34,10 @@ func NewChannelStorage(db *sqlx.DB) storage.ChannelStorage {
 type channelM struct {
 	sqlx.Base
 
-	ChannelName string `sql:"channel_name"`
-	DriverName  string `sql:"driver_name"`
-	DriverType  string `sql:"driver_type"`
-	DriverConf  string `sql:"driver_conf"`
+	ChannelName string    `sql:"channel_name"`
+	DriverName  string    `sql:"driver_name"`
+	DriverConf  string    `sql:"driver_conf"`
+	IsDefault   sqlx.Bool `sql:"is_default"`
 }
 
 type chStorage struct{ sqlx.Table }
@@ -54,8 +55,8 @@ func (s chStorage) AddChannel(c context.Context, channel channel.Channel) error 
 	_, err := s.InsertInto().Struct(channelM{
 		ChannelName: channel.ChannelName,
 		DriverName:  channel.DriverName,
-		DriverType:  channel.DriverType,
 		DriverConf:  driverConf,
+		IsDefault:   sqlx.Bool(channel.IsDefault),
 	}).ExecContext(c)
 	return err
 }
@@ -82,7 +83,7 @@ func (s chStorage) GetChannel(c context.Context, name string) (channel.Channel, 
 	channel := channel.Channel{
 		ChannelName: cm.ChannelName,
 		DriverName:  cm.DriverName,
-		DriverType:  cm.DriverType,
+		IsDefault:   cm.IsDefault.Bool(),
 	}
 	if cm.DriverConf != "" {
 		r := bytes.NewReader([]byte(cm.DriverConf))
@@ -104,6 +105,10 @@ func (s chStorage) GetChannels(c context.Context, pageNum, pageSize int64) ([]ch
 		return nil, err
 	}
 
+	sort.SliceStable(_channels, func(i, j int) bool {
+		return _channels[i].UpdatedAt.After(_channels[j].UpdatedAt.Time)
+	})
+
 	channels := make([]channel.Channel, len(_channels))
 	for i, c := range _channels {
 		var driverConf map[string]interface{}
@@ -117,8 +122,8 @@ func (s chStorage) GetChannels(c context.Context, pageNum, pageSize int64) ([]ch
 		channels[i] = channel.Channel{
 			ChannelName: c.ChannelName,
 			DriverName:  c.DriverName,
-			DriverType:  c.DriverType,
 			DriverConf:  driverConf,
+			IsDefault:   c.IsDefault.Bool(),
 		}
 	}
 

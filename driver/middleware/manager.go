@@ -42,9 +42,9 @@ type Manager struct {
 }
 
 // NewManager returns a new middleware manager.
-func NewManager(driver driver.Driver) *Manager {
+func NewManager(defaultDriver driver.Driver) *Manager {
 	m := &Manager{maps: make(map[string]Middleware, 8)}
-	m.orig.Store(driverWrapper{Driver: driver})
+	m.orig.Store(driverWrapper{Driver: defaultDriver})
 	m.updateMiddlewares()
 	return m
 }
@@ -139,9 +139,15 @@ func (m *Manager) GetMiddlewares() Middlewares {
 	return m.mdws.Load().(middlewaresWrapper).Middlewares
 }
 
-// WrapDriver uses the inner middlewares to wrap the given driver.
+// WrapDriver is equal to m.WrapDriverWithType("", driver).
 func (m *Manager) WrapDriver(driver driver.Driver) driver.Driver {
-	return m.GetMiddlewares().WrapDriver(driver)
+	return m.WrapDriverWithType("", driver)
+}
+
+// WrapDriverWithType uses the inner middlewares of the specific type
+// to wrap the given driver.
+func (m *Manager) WrapDriverWithType(_type string, driver driver.Driver) driver.Driver {
+	return m.GetMiddlewares().WrapDriverWithType(_type, driver)
 }
 
 func (m *Manager) updateMiddlewares() {

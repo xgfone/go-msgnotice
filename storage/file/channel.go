@@ -29,6 +29,7 @@ import (
 //
 //	[
 //	    {
+//	        "IsDefault": false,
 //	        "ChannelName": "xxx",
 //	        "DriverName": "yyy",
 //	        "DriverConfig": {

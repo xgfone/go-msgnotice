@@ -39,8 +39,8 @@ type Getter func(c context.Context, name string) (storage.Template, error)
 
 // New returns a new template middleware to render the content
 // from a given template with the arguments.
-func New(priority int, getTmpl Getter) middleware.Middleware {
-	return middleware.NewMiddleware("template", priority, func(d driver.Driver) driver.Driver {
+func New(_type string, priority int, getTmpl Getter) middleware.Middleware {
+	return middleware.NewMiddleware("template", _type, priority, func(d driver.Driver) driver.Driver {
 		return &driverImpl{Driver: d, getTmpl: getTmpl}
 	})
 }

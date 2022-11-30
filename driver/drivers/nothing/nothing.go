@@ -12,25 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package stdout provides a driver to send the message to stdout.
-package stdout
+// Package nothing provides a driver to do nothing.
+package nothing
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/builder"
 )
 
-func init() { builder.NewAndRegister("stdout", "stdout", New) }
+func init() { builder.NewAndRegister("nothing", "nothing", New) }
 
 // New returns a new driver, which outputs the message to stdout.
 func New(_ map[string]interface{}) (driver.Driver, error) {
 	return driver.Sender(send), nil
 }
 
-func send(c context.Context, t, cnt string, md map[string]interface{}, tos ...string) error {
-	fmt.Printf("title=%s, content=%s, metadata=%v, tos=%v\n", t, cnt, md, tos)
+func send(_ context.Context, _, _ string, _ map[string]interface{}, _ ...string) error {
 	return nil
 }
