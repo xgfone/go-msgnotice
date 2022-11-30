@@ -41,6 +41,8 @@ func NewChannelStorage(filepath string) (storage.ChannelStorage, error) {
 	data, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		return nil, err
+	} else if len(data) == 0 {
+		return static.NewChannelStorage(), nil
 	}
 
 	var channels []channel.Channel
