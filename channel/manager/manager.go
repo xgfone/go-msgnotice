@@ -22,13 +22,14 @@ import (
 	"sync/atomic"
 
 	"github.com/xgfone/go-msgnotice/channel"
+	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/middleware"
 )
 
 // Default is the global default channel manager.
 var Default = NewManager(middleware.DefaultManager)
 
-func init() { channel.Send = Default.Send }
+func init() { channel.Send = Default.SendWithChannel }
 
 // NewChannelFunc is a function to new a channel from the config.
 type NewChannelFunc func(channelName, driverName string, driverConf map[string]interface{}) (*channel.Channel, error)
@@ -161,15 +162,16 @@ func (m *Manager) BuildAndUpsertChannels(channels ...channel.Channel) error {
 	return nil
 }
 
-// Send is a convenient function to look up the channel by the name
+// SendWithChannel is a convenient function to look up the channel by the name
 // from the global cache and send the message with the channel.
-func (m *Manager) Send(c context.Context, channelName, title, content string,
-	metadata map[string]interface{}, receivers ...string) (err error) {
+//
+// If channelName is empty, use GetDefaultChannelName to get the default channel.
+func (m *Manager) SendWithChannel(ctx context.Context, channelName string, msg driver.Message) (err error) {
 	if channelName == "" {
 		if m.GetDefaultChannelName != nil {
-			channelName, err = m.GetDefaultChannelName(c, metadata)
+			channelName, err = m.GetDefaultChannelName(ctx, msg.Metadata)
 		} else {
-			channelName, err = DefaultChannels.GetDefaultChannelName(c, metadata)
+			channelName, err = DefaultChannels.GetDefaultChannelName(ctx, msg.Metadata)
 		}
 
 		if err != nil {
@@ -178,7 +180,7 @@ func (m *Manager) Send(c context.Context, channelName, title, content string,
 	}
 
 	if channel, ok := m.getChannels()[channelName]; ok {
-		err = channel.Send(c, title, content, metadata, receivers...)
+		err = channel.Send(ctx, msg)
 	} else {
 		err = fmt.Errorf("no channel named '%s'", channelName)
 	}
@@ -186,7 +188,14 @@ func (m *Manager) Send(c context.Context, channelName, title, content string,
 	return
 }
 
-// Stop stops all the registered channels.
+// Send implements the interface driver.Driver#Send,
+// which is equal to m.SendWithChannel(ctx, "", msg).
+func (m *Manager) Send(ctx context.Context, msg driver.Message) (err error) {
+	return m.SendWithChannel(ctx, "", msg)
+}
+
+// Stop implements the interface driver.Driver#Stop,
+// which stops all the registered channels.
 func (m *Manager) Stop() {
 	for _, channel := range m.GetAllChannels() {
 		channel.Stop()

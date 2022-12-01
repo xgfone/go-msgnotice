@@ -27,10 +27,9 @@ func init() { builder.NewAndRegister("stdout", "stdout", New) }
 
 // New returns a new driver, which outputs the message to stdout.
 func New(_ map[string]interface{}) (driver.Driver, error) {
-	return driver.Sender(send), nil
-}
-
-func send(c context.Context, t, cnt string, md map[string]interface{}, tos ...string) error {
-	fmt.Printf("title=%s, content=%s, metadata=%v, tos=%v\n", t, cnt, md, tos)
-	return nil
+	return driver.Sender(func(c context.Context, m driver.Message) error {
+		fmt.Printf("title=%s, content=%s, receiver=%s, metadata=%v\n",
+			m.Title, m.Content, m.Receiver, m.Metadata)
+		return nil
+	}), nil
 }

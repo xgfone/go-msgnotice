@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net"
 	"net/smtp"
+	"strings"
 
 	"github.com/jordan-wright/email"
 	"github.com/xgfone/go-msgnotice/driver"
@@ -31,7 +32,7 @@ const DriverType = "email"
 
 func init() { builder.NewAndRegister(DriverType, DriverType, New) }
 
-// New returns a new driver, which sends the message by the email,
+// New returns a new driver, which sends the message by the html email,
 // which is registered as the driver builder with name "email"
 // and type DriverType by default.
 //
@@ -42,6 +43,8 @@ func init() { builder.NewAndRegister(DriverType, DriverType, New) }
 //	username(string, required): the username to login the mail server, such as "username@mail.example.com".
 //	password(string, required): the password to login the mail server, such as "password".
 //	forcetls(bool, optional): If true, force to use TLS.
+//
+// Notice: The returned driver supports the comma-separated receiver list.
 func New(config map[string]interface{}) (driver.Driver, error) {
 	addr, _ := config["addr"].(string)
 	from, _ := config["from"].(string)
@@ -87,13 +90,12 @@ type driverImpl struct {
 }
 
 func (d driverImpl) Stop() { d.pool.Close() }
-func (d driverImpl) Send(c context.Context, title, content string,
-	metadata map[string]interface{}, tos ...string) error {
+func (d driverImpl) Send(c context.Context, m driver.Message) error {
 	mail := email.NewEmail()
 	mail.From = d.from
-	mail.To = tos
-	mail.Subject = title
-	mail.HTML = []byte(content)
+	mail.To = strings.Split(m.Receiver, ",")
+	mail.Subject = m.Title
+	mail.HTML = []byte(m.Content)
 	return d.pool.Send(mail, -1)
 }
 

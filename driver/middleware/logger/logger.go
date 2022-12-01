@@ -27,13 +27,10 @@ import (
 
 // Event represents a log message event.
 type Event struct {
-	Channel   *channel.Channel
-	Title     string
-	Content   string
-	Metadata  map[string]interface{}
-	Receivers []string
-	Start     time.Time
-	Err       error
+	driver.Message
+	Channel *channel.Channel
+	Start   time.Time
+	Err     error
 }
 
 // LogEvent is used to log the message event.
@@ -50,32 +47,20 @@ func logevent(e Event) {
 			cname = e.Channel.ChannelName
 		}
 
-		log.Printf("channel=%s, title=%s, content=%s, metadata=%v, receivers=%v, start=%d, cost=%s, err=%v",
-			cname, e.Title, e.Content, e.Metadata, e.Receivers, e.Start.Unix(), time.Since(e.Start), e.Err)
+		log.Printf("channel=%s, title=%s, content=%s, receivers=%s, metadata=%v, start=%d, cost=%s, err=%v",
+			cname, e.Title, e.Content, e.Receiver, e.Metadata, e.Start.Unix(), time.Since(e.Start), e.Err)
 	}
 }
 
 // New returns a new logger middleware to log the sent message.
 func New(_type string, priority int) middleware.Middleware {
 	return middleware.NewMiddleware("logger", _type, priority, func(d driver.Driver) driver.Driver {
-		return &driverImpl{d}
+		return driver.NewDriver(func(c context.Context, m driver.Message) error {
+			start := time.Now()
+			err := d.Send(c, m)
+			ch := channel.GetChannelFromContext(c)
+			logevent(Event{Channel: ch, Message: m, Start: start, Err: err})
+			return err
+		}, d.Stop)
 	})
-}
-
-type driverImpl struct{ driver.Driver }
-
-func (d *driverImpl) Send(c context.Context, title, content string,
-	metadata map[string]interface{}, tos ...string) (err error) {
-	start := time.Now()
-	err = d.Driver.Send(c, title, content, metadata, tos...)
-	logevent(Event{
-		Channel:   channel.GetChannelFromContext(c),
-		Title:     title,
-		Content:   content,
-		Metadata:  metadata,
-		Receivers: tos,
-		Start:     start,
-		Err:       err,
-	})
-	return
 }

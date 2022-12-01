@@ -50,16 +50,14 @@ type driverImpl struct {
 	getTmpl Getter
 }
 
-func (d *driverImpl) Send(c context.Context, title, content string,
-	metadata map[string]interface{}, tos ...string) (err error) {
-	if strings.HasPrefix(content, "tmpl:") {
-		content, err = d.render(c, content[len("tmpl:"):], metadata)
+func (d *driverImpl) Send(c context.Context, m driver.Message) (err error) {
+	if strings.HasPrefix(m.Content, "tmpl:") {
+		m.Content, err = d.render(c, m.Content[len("tmpl:"):], m.Metadata)
 		if err != nil {
 			return
 		}
 	}
-
-	return d.Driver.Send(c, title, content, metadata, tos...)
+	return d.Driver.Send(c, m)
 }
 
 func (d *driverImpl) render(c context.Context, name string,

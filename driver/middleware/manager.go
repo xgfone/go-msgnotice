@@ -181,8 +181,8 @@ var _ driver.Driver = new(Manager)
 // Send implements the interface driver.Driver#Send.
 //
 // Notice: the driver must be set.
-func (m *Manager) Send(c context.Context, title, content string, metadata map[string]interface{}, tos ...string) error {
-	return m.getDriver().Send(c, title, content, metadata, tos...)
+func (m *Manager) Send(c context.Context, msg driver.Message) error {
+	return m.getDriver().Send(c, msg)
 }
 
 // Stop implements the interface driver.Driver#Stop.

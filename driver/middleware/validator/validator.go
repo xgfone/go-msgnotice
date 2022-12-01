@@ -12,28 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package timeout provides a driver middleware to set the context timeout.
-package timeout
+// Package validator provides a driver middleware to validate
+// whether the receiver is valid.
+package validator
 
 import (
 	"context"
-	"time"
 
 	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/middleware"
 )
 
-// New returns a new timeout middleware to set the context timeout.
-func New(_type string, priority int, timeout time.Duration) middleware.Middleware {
-	if timeout <= 0 {
-		panic("the timeout must be a positive")
+// New returns a new driver middleware to validate whether the receiver is valid.
+func New(_type string, priority int, validate func(receiver string) error) middleware.Middleware {
+	if validate == nil {
+		panic("the validate must not be nil")
 	}
 
-	return middleware.NewMiddleware("timeout", _type, priority, func(d driver.Driver) driver.Driver {
-		return driver.NewDriver(func(c context.Context, m driver.Message) error {
-			c, cancel := context.WithTimeout(c, timeout)
-			defer cancel()
-			return d.Send(c, m)
+	return middleware.NewMiddleware("validator", _type, priority, func(d driver.Driver) driver.Driver {
+		return driver.NewDriver(func(c context.Context, m driver.Message) (err error) {
+			if err = validate(m.Receiver); err == nil {
+				err = d.Send(c, m)
+			}
+			return
 		}, d.Stop)
 	})
 }

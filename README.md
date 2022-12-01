@@ -37,9 +37,10 @@ var (
 )
 
 func wrapDriver(_name, _type string, _driver driver.Driver) driver.Driver {
-	return driver.NewDriver(func(ctx context.Context, t, c string, md map[string]interface{}, tos ...string) error {
-		log.Printf("middleware=%s, type=%s, title=%s, content=%s, tos=%v", _name, _type, t, c, tos)
-		return _driver.Send(ctx, t, c, md, tos...)
+	return driver.NewDriver(func(c context.Context, m driver.Message) error {
+		log.Printf("middleware=%s, type=%s, title=%s, content=%s, receiver=%s",
+			_name, _type, m.Title, m.Content, m.Receiver)
+		return _driver.Send(c, m)
 	}, _driver.Stop)
 }
 
@@ -85,19 +86,19 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Timeout   string
-		Channel   string
-		Title     string
-		Content   string
-		Metadata  map[string]interface{}
-		Receivers []string
+		Timeout  string
+		Channel  string
+		Title    string
+		Content  string
+		Receiver string
+		Metadata map[string]interface{}
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if req.Channel == "" || req.Title == "" || req.Content == "" || len(req.Receivers) == 0 {
+	if req.Channel == "" || req.Title == "" || req.Content == "" || len(req.Receiver) == 0 {
 		http.Error(w, "missing the required arguments", 400)
 		return
 	}
@@ -115,7 +116,8 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 	}
 
-	err := channel.Send(ctx, req.Channel, req.Title, req.Content, req.Metadata, req.Receivers...)
+	msg := driver.NewMessage(req.Receiver, req.Title, req.Content, req.Metadata)
+	err := channel.Send(ctx, req.Channel, msg)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -176,9 +178,9 @@ $ msgnotice &
 
 # Client sends the message.
 $ curl http://localhost/message -XPOST -H 'Content-Type: application/json' \
--d '{"Channel":"stdout", "Title":"title", "Content":"content", "Receivers":["someone"]}'
+-d '{"Channel":"stdout", "Title":"title", "Content":"content", "Receiver":"someone"}'
 $ curl http://localhost/message -XPOST -H 'Content-Type: application/json' \
--d '{"Channel":"email", "Title":"title", "Content":"content", "Receivers":["someone@mail.com"]}'
+-d '{"Channel":"email", "Title":"title", "Content":"content", "Receiver":"someone@mail.com"}'
 $ curl http://localhost/message -XPOST -H 'Content-Type: application/json' \
--d '{"Channel":"email", "Title":"title", "Content":"tmpl:hello", "Metadata":{"name":"xgfone"}, "Receivers":["someone@mail.com"]}'
+-d '{"Channel":"email", "Title":"title", "Content":"tmpl:hello", "Metadata":{"name":"xgfone"}, "Receiver":"someone@mail.com"}'
 ```

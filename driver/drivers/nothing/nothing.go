@@ -26,9 +26,7 @@ func init() { builder.NewAndRegister("nothing", "nothing", New) }
 
 // New returns a new driver, which outputs the message to stdout.
 func New(_ map[string]interface{}) (driver.Driver, error) {
-	return driver.Sender(send), nil
-}
-
-func send(_ context.Context, _, _ string, _ map[string]interface{}, _ ...string) error {
-	return nil
+	return driver.Sender(func(c context.Context, m driver.Message) error {
+		return nil
+	}), nil
 }

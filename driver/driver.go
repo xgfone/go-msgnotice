@@ -23,19 +23,35 @@ import (
 // ErrNoDriver is used to represent the error that the driver does not exist.
 var ErrNoDriver = errors.New("no driver")
 
+// Message is the message information.
+type Message struct {
+	Title    string
+	Content  string
+	Receiver string
+	Metadata map[string]interface{}
+}
+
+// NewMessage returns a message witht the given information.
+func NewMessage(receiver, title, content string, metadata map[string]interface{}) Message {
+	return Message{
+		Title:    title,
+		Content:  content,
+		Receiver: receiver,
+		Metadata: metadata,
+	}
+}
+
 // Driver is used to send the message to the endpoint.
 type Driver interface {
-	Send(c context.Context, title, content string, metadata map[string]interface{}, tos ...string) error
+	Send(context.Context, Message) error
 	Stop()
 }
 
 // Sender is the driver send function.
-type Sender func(c context.Context, title, content string, md map[string]interface{}, tos ...string) error
+type Sender func(c context.Context, m Message) error
 
 // Send implements the interface Driver#Send.
-func (s Sender) Send(c context.Context, title, content string, md map[string]interface{}, tos ...string) error {
-	return s(c, title, content, md, tos...)
-}
+func (s Sender) Send(c context.Context, m Message) error { return s(c, m) }
 
 // Stop implements the interface Driver#Stop, which does nothing.
 func (s Sender) Stop() {}
@@ -47,6 +63,9 @@ func NewDriver(send Sender, stop func()) Driver {
 	if send == nil {
 		panic("the driver send function must not be nil")
 	}
+	if stop == nil {
+		stop = donothing
+	}
 	return driver{send: send, stop: stop}
 }
 
@@ -55,12 +74,6 @@ type driver struct {
 	stop func()
 }
 
-func (d driver) Stop() {
-	if d.stop != nil {
-		d.stop()
-	}
-}
-
-func (d driver) Send(c context.Context, t, cnt string, md map[string]interface{}, tos ...string) error {
-	return d.send(c, t, cnt, md, tos...)
-}
+func (d driver) Send(c context.Context, m Message) error { return d.send(c, m) }
+func (d driver) Stop()                                   { d.stop() }
+func donothing()                                         {}

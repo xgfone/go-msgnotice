@@ -28,7 +28,9 @@ type ctxkey int8
 
 var channelkey = ctxkey(123)
 
-func setChannelIntoContext(ctx context.Context, channel *Channel) context.Context {
+// SetChannelIntoContext sets the channel into the context
+// and returns the new context.
+func SetChannelIntoContext(ctx context.Context, channel *Channel) context.Context {
 	return context.WithValue(ctx, channelkey, channel)
 }
 
@@ -47,10 +49,12 @@ var ErrNoChannel = errors.New("no channel")
 
 // Send is the convenient unified function to send the message.
 //
-// Notice: it will be set to manager.Default.Send if importing the package
-// "github.com/xgfone/go-msgnotice/channel/manager",
-var Send func(c context.Context, channelName, title, content string,
-	metadata map[string]interface{}, tos ...string) error
+// Notice: it will be set to manager.Default.SendWithChannel if importing
+// the package "github.com/xgfone/go-msgnotice/channel/manager",
+var Send Sender
+
+// Sender is the function to send the message notice by the channel.
+type Sender func(ctx context.Context, channelName string, msg driver.Message) error
 
 // Channel represents a channel to send the message.
 type Channel struct {
@@ -99,8 +103,9 @@ var _ driver.Driver = new(Channel)
 
 // Send sends the message to the endpoint by the driver.
 //
-// Notice: it will put the channel itself into the context ctx,
-// which can be got out from the context by calling GetChannelFromContext.
-func (c *Channel) Send(ctx context.Context, title, content string, md map[string]interface{}, tos ...string) error {
-	return c.Driver.Send(setChannelIntoContext(ctx, c), title, content, md, tos...)
+// Notice: it will put the channel itself into the context ctx
+// by SetChannelIntoContext, which can be got out from the context
+// by GetChannelFromContext.
+func (c *Channel) Send(ctx context.Context, m driver.Message) error {
+	return c.Driver.Send(SetChannelIntoContext(ctx, c), m)
 }
