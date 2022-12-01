@@ -166,6 +166,7 @@ func (m *Manager) BuildAndUpsertChannels(channels ...channel.Channel) error {
 // from the global cache and send the message with the channel.
 //
 // If channelName is empty, use GetDefaultChannelName to get the default channel.
+// If there is not the channel, return channel.NoChannelError(channelName).
 func (m *Manager) SendWithChannel(ctx context.Context, channelName string, msg driver.Message) (err error) {
 	if channelName == "" {
 		if m.GetDefaultChannelName != nil {
@@ -179,10 +180,10 @@ func (m *Manager) SendWithChannel(ctx context.Context, channelName string, msg d
 		}
 	}
 
-	if channel, ok := m.getChannels()[channelName]; ok {
-		err = channel.Send(ctx, msg)
+	if ch, ok := m.getChannels()[channelName]; ok {
+		err = ch.Send(ctx, msg)
 	} else {
-		err = fmt.Errorf("no channel named '%s'", channelName)
+		err = channel.NoChannelError(channelName)
 	}
 
 	return

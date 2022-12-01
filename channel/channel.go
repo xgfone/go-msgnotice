@@ -109,3 +109,10 @@ var _ driver.Driver = new(Channel)
 func (c *Channel) Send(ctx context.Context, m driver.Message) error {
 	return c.Driver.Send(SetChannelIntoContext(ctx, c), m)
 }
+
+// NoChannelError represents the error that there is not the given channel.
+type NoChannelError string
+
+func (e NoChannelError) Error() string {
+	return fmt.Sprintf("no channel named '%s'", string(e))
+}
