@@ -18,9 +18,12 @@ package email
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/smtp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jordan-wright/email"
 	"github.com/xgfone/go-msgnotice/driver"
@@ -38,11 +41,15 @@ func init() { builder.NewAndRegister(DriverType, DriverType, New) }
 //
 // config options:
 //
-//	addr(string, required): the mail server address, such as "mail.examole.com:25".
+//	addr(string, required): the mail server address, such as "mail.examole.com".
 //	from(string, required): the adddress to send email, such as "username@mail.example.com".
 //	username(string, required): the username to login the mail server, such as "username@mail.example.com".
 //	password(string, required): the password to login the mail server, such as "password".
-//	forcetls(bool, optional): If true, force to use TLS.
+//	forcetls(int|int64|uint|uint64|string|bool, optional): if true, force to use TLS. For integer, 0 is false else true.
+//	timeout(int|int64|uint|uint64|string, optional): the timeout. if integer, stand for second. default 3s.
+//	maxconnnum(int|int64|uint|uint64, optional): the maximum number of the connection, default 100.
+//
+// If addr does not contain the port, use 465 if forcetls is true else 25.
 //
 // Notice: The returned driver supports the comma-separated receiver list.
 func New(config map[string]interface{}) (driver.Driver, error) {
@@ -50,23 +57,95 @@ func New(config map[string]interface{}) (driver.Driver, error) {
 	from, _ := config["from"].(string)
 	username, _ := config["username"].(string)
 	password, _ := config["password"].(string)
-	forceTLS, _ := config["forcetls"].(bool)
 	if addr == "" {
-		return nil, errors.New("Addr is missing or invalid")
+		return nil, errors.New("addr is missing or invalid")
 	}
 	if from == "" {
-		return nil, errors.New("From is missing or invalid")
+		return nil, errors.New("from is missing or invalid")
 	}
 	if username == "" {
-		return nil, errors.New("Username is missing or invalid")
+		return nil, errors.New("username is missing or invalid")
 	}
 	if password == "" {
-		return nil, errors.New("Password is missing or invalid")
+		return nil, errors.New("password is missing or invalid")
+	}
+
+	var maxconnnum int
+	switch v := config["maxconnnum"].(type) {
+	case nil:
+		maxconnnum = 100
+	case int:
+		maxconnnum = v
+	case int64:
+		maxconnnum = int(v)
+	case uint:
+		maxconnnum = int(v)
+	case uint64:
+		maxconnnum = int(v)
+	default:
+		return nil, fmt.Errorf("unsupported maxconnnum type %T", v)
+	}
+
+	var timeout time.Duration
+	switch v := config["timeout"].(type) {
+	case nil:
+		timeout = 3 * time.Second
+
+	case int:
+		timeout = time.Duration(v) * time.Second
+	case int64:
+		timeout = time.Duration(v) * time.Second
+	case uint:
+		timeout = time.Duration(v) * time.Second
+	case uint64:
+		timeout = time.Duration(v) * time.Second
+
+	case string:
+		t, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid timeout: %s", err)
+		}
+		timeout = t
+
+	default:
+		return nil, fmt.Errorf("unsupported timeout type %T", v)
+	}
+
+	var forceTLS bool
+	switch v := config["forcetls"].(type) {
+	case nil:
+	case bool:
+		forceTLS = v
+
+	case int:
+		forceTLS = v != 0
+	case int64:
+		forceTLS = v != 0
+	case uint:
+		forceTLS = v != 0
+	case uint64:
+		forceTLS = v != 0
+
+	case string:
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid forcetls: %s", err)
+		}
+		forceTLS = b
+
+	default:
+		return nil, fmt.Errorf("unsupported forcetls type %T", v)
 	}
 
 	hostname := addr
 	if host, _, err := net.SplitHostPort(addr); err == nil {
 		hostname = host
+	} else {
+		if forceTLS {
+			addr = net.JoinHostPort(addr, "465")
+		} else {
+			addr = net.JoinHostPort(addr, "25")
+		}
 	}
 
 	var auth smtp.Auth
@@ -76,15 +155,16 @@ func New(config map[string]interface{}) (driver.Driver, error) {
 		auth = newPlainAuth("", username, password, hostname)
 	}
 
-	pool, err := email.NewPool(addr, 100, auth)
+	pool, err := email.NewPool(addr, maxconnnum, auth)
 	if err != nil {
 		return nil, err
 	}
 
-	return driverImpl{from: from, pool: pool}, nil
+	return driverImpl{from: from, pool: pool, timo: timeout}, nil
 }
 
 type driverImpl struct {
+	timo time.Duration
 	pool *email.Pool
 	from string
 }
@@ -96,7 +176,7 @@ func (d driverImpl) Send(c context.Context, m driver.Message) error {
 	mail.To = strings.Split(m.Receiver, ",")
 	mail.Subject = m.Title
 	mail.HTML = []byte(m.Content)
-	return d.pool.Send(mail, -1)
+	return d.pool.Send(mail, d.timo)
 }
 
 type plainAuth struct {
