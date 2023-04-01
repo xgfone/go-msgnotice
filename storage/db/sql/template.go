@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/xgfone/go-msgnotice/storage"
-	"github.com/xgfone/sqlx"
+	"github.com/xgfone/go-sqlx"
 )
 
 // NewTemplateStorage returns a new template storage based on database/sql.

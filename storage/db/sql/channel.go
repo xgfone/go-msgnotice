@@ -23,7 +23,7 @@ import (
 
 	"github.com/xgfone/go-msgnotice/channel"
 	"github.com/xgfone/go-msgnotice/storage"
-	"github.com/xgfone/sqlx"
+	"github.com/xgfone/go-sqlx"
 )
 
 // NewChannelStorage returns a new channel storage based on database/sql.
@@ -34,10 +34,10 @@ func NewChannelStorage(db *sqlx.DB) storage.ChannelStorage {
 type channelM struct {
 	sqlx.Base
 
-	ChannelName string    `sql:"channel_name"`
-	DriverName  string    `sql:"driver_name"`
-	DriverConf  string    `sql:"driver_conf"`
-	IsDefault   sqlx.Bool `sql:"is_default"`
+	ChannelName string `sql:"channel_name"`
+	DriverName  string `sql:"driver_name"`
+	DriverConf  string `sql:"driver_conf"`
+	IsDefault   bool   `sql:"is_default"`
 }
 
 type chStorage struct{ sqlx.Table }
@@ -56,7 +56,7 @@ func (s chStorage) AddChannel(c context.Context, channel channel.Channel) error 
 		ChannelName: channel.ChannelName,
 		DriverName:  channel.DriverName,
 		DriverConf:  driverConf,
-		IsDefault:   sqlx.Bool(channel.IsDefault),
+		IsDefault:   bool(channel.IsDefault),
 	}).ExecContext(c)
 	return err
 }
@@ -83,7 +83,7 @@ func (s chStorage) GetChannel(c context.Context, name string) (channel.Channel, 
 	channel := channel.Channel{
 		ChannelName: cm.ChannelName,
 		DriverName:  cm.DriverName,
-		IsDefault:   cm.IsDefault.Bool(),
+		IsDefault:   cm.IsDefault,
 	}
 	if cm.DriverConf != "" {
 		r := bytes.NewReader([]byte(cm.DriverConf))
@@ -123,7 +123,7 @@ func (s chStorage) GetChannels(c context.Context, pageNum, pageSize int64) ([]ch
 			ChannelName: c.ChannelName,
 			DriverName:  c.DriverName,
 			DriverConf:  driverConf,
-			IsDefault:   c.IsDefault.Bool(),
+			IsDefault:   c.IsDefault,
 		}
 	}
 

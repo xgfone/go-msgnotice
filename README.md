@@ -1,6 +1,6 @@
 # A Common Message Notice Library [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-msgnotice)](https://pkg.go.dev/github.com/xgfone/go-msgnotice) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-msgnotice/master/LICENSE)
 
-A common message notice library supporting `Go1.11+`.
+A common message notice library supporting `Go1.18+`.
 
 
 ## Example
