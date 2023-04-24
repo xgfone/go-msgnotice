@@ -1,7 +1,7 @@
 module github.com/xgfone/go-msgnotice
 
 require (
-	github.com/jordan-wright/email v0.0.0-20210109023952-943e75fe5223
+	github.com/knadh/smtppool v1.0.2
 	github.com/xgfone/go-sqlx v0.25.0
 )
 

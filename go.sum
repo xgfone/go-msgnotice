@@ -1,5 +1,5 @@
-github.com/jordan-wright/email v0.0.0-20210109023952-943e75fe5223 h1:QiwF4D/5BpGJysOwessRAabllHCcqC9vM/aQRstZBdM=
-github.com/jordan-wright/email v0.0.0-20210109023952-943e75fe5223/go.mod h1:1c7szIrayyPPB/987hsnvNzLushdWf4o/79s3P08L8A=
+github.com/knadh/smtppool v1.0.2 h1:qg2A2DYqrfeCxxAonVaL9xruhIP+e7xhq+TImyiLajQ=
+github.com/knadh/smtppool v1.0.2/go.mod h1:3DJHouXAgPDBz0kC50HukOsdapYSwIEfJGwuip46oCA=
 github.com/xgfone/go-defaults v0.2.0 h1:1/k2GdF3X2HzBWtOu/jaLgK6E+7gd4Nq4q6rEzBl2mU=
 github.com/xgfone/go-defaults v0.2.0/go.mod h1:zwcnD8escc6E5QrCNKRLQddb4/hcUnUOM20kUeki18Y=
 github.com/xgfone/go-sqlx v0.25.0 h1:ce1V1aWhrbZsuoA25nK7yeCPxJ1Ux1rCDhmvixN2MPw=

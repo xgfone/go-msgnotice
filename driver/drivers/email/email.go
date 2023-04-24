@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jordan-wright/email"
+	"github.com/knadh/smtppool"
 	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/builder"
 )
@@ -46,7 +46,8 @@ func init() { builder.NewAndRegister(DriverType, DriverType, New) }
 //	username(string, required): the username to login the mail server, such as "username@mail.example.com".
 //	password(string, required): the password to login the mail server, such as "password".
 //	forcetls(int|int64|uint|uint64|string|bool, optional): if true, force to use TLS. For integer, 0 is false else true.
-//	timeout(int|int64|uint|uint64|string, optional): the timeout. if integer, stand for second. default 3s.
+//	timeout(int|int64|uint|uint64|string, optional): the timeout. If integer, stand for second. default 3s.
+//	idletimeout(int|int64|uint|uint64|string, optional): time idle timeout. If integer, stand for second. default 1m.
 //	maxconnnum(int|int64|uint|uint64, optional): the maximum number of the connection, default 100.
 //
 // If addr does not contain the port, use 465 if forcetls is true else 25.
@@ -111,6 +112,31 @@ func New(config map[string]interface{}) (driver.Driver, error) {
 		return nil, fmt.Errorf("unsupported timeout type %T", v)
 	}
 
+	var idleTimeout time.Duration
+	switch v := config["idletimeout"].(type) {
+	case nil:
+		idleTimeout = time.Minute
+
+	case int:
+		idleTimeout = time.Duration(v) * time.Second
+	case int64:
+		idleTimeout = time.Duration(v) * time.Second
+	case uint:
+		idleTimeout = time.Duration(v) * time.Second
+	case uint64:
+		idleTimeout = time.Duration(v) * time.Second
+
+	case string:
+		t, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid idle timeout: %s", err)
+		}
+		idleTimeout = t
+
+	default:
+		return nil, fmt.Errorf("unsupported idle timeout type %T", v)
+	}
+
 	var forceTLS bool
 	switch v := config["forcetls"].(type) {
 	case nil:
@@ -137,46 +163,62 @@ func New(config map[string]interface{}) (driver.Driver, error) {
 		return nil, fmt.Errorf("unsupported forcetls type %T", v)
 	}
 
-	hostname := addr
-	if host, _, err := net.SplitHostPort(addr); err == nil {
-		hostname = host
+	var port int
+	var host string
+	if _host, _port, err := net.SplitHostPort(addr); err == nil {
+		host = _host
+		v, err := strconv.ParseUint(_port, 10, 16)
+		if err != nil {
+			return nil, fmt.Errorf("invalid port: %w", err)
+		}
+		port = int(v)
 	} else {
+		host = addr
 		if forceTLS {
-			addr = net.JoinHostPort(addr, "465")
+			port = 465
 		} else {
-			addr = net.JoinHostPort(addr, "25")
+			port = 25
 		}
 	}
 
 	var auth smtp.Auth
 	if forceTLS {
-		auth = smtp.PlainAuth("", username, password, hostname)
+		auth = smtp.PlainAuth("", username, password, host)
 	} else {
-		auth = newPlainAuth("", username, password, hostname)
+		auth = newPlainAuth("", username, password, host)
 	}
 
-	pool, err := email.NewPool(addr, maxconnnum, auth)
+	opt := smtppool.Opt{
+		Host:            host,
+		Port:            port,
+		Auth:            auth,
+		MaxConns:        maxconnnum,
+		IdleTimeout:     idleTimeout,
+		PoolWaitTimeout: timeout,
+		// TLSConfig: nil,
+		// SSL: false,
+	}
+	pool, err := smtppool.New(opt)
 	if err != nil {
 		return nil, err
 	}
 
-	return driverImpl{from: from, pool: pool, timo: timeout}, nil
+	return driverImpl{from: from, pool: pool}, nil
 }
 
 type driverImpl struct {
-	timo time.Duration
-	pool *email.Pool
+	pool *smtppool.Pool
 	from string
 }
 
 func (d driverImpl) Stop() { d.pool.Close() }
 func (d driverImpl) Send(c context.Context, m driver.Message) error {
-	mail := email.NewEmail()
+	var mail smtppool.Email
 	mail.From = d.from
 	mail.To = strings.Split(m.Receiver, ",")
 	mail.Subject = m.Title
 	mail.HTML = []byte(m.Content)
-	return d.pool.Send(mail, d.timo)
+	return d.pool.Send(mail)
 }
 
 type plainAuth struct {
@@ -186,10 +228,6 @@ type plainAuth struct {
 
 func newPlainAuth(identity, username, password, host string) smtp.Auth {
 	return &plainAuth{identity, username, password, host}
-}
-
-func isLocalhost(name string) bool {
-	return name == "localhost" || name == "127.0.0.1" || name == "::1"
 }
 
 func (a *plainAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
