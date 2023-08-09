@@ -23,7 +23,6 @@ import (
 
 	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/middleware"
-	"github.com/xgfone/go-msgnotice/storage"
 )
 
 // Error is used to represents the template error.
@@ -32,22 +31,37 @@ type Error struct {
 	error
 }
 
+// Template represents a message template.
+type Template struct {
+	Name string
+	Tmpl string
+	Args []string
+}
+
 // Getter is used to get the template by the name.
-//
-// If there is not the template named name, return (storage.Template{}, nil).
-type Getter func(c context.Context, name string) (storage.Template, error)
+type Getter interface {
+	GetTemplate(c context.Context, name string) (Template, bool, error)
+}
+
+// GetterFunc is the template getter function.
+type GetterFunc func(c context.Context, name string) (Template, bool, error)
+
+// GetTemplate implements the interface Getter.
+func (f GetterFunc) GetTemplate(c context.Context, name string) (Template, bool, error) {
+	return f(c, name)
+}
 
 // New returns a new template middleware to render the content
 // from a given template with the arguments.
-func New(_type string, priority int, getTmpl Getter) middleware.Middleware {
+func New(_type string, priority int, getter Getter) middleware.Middleware {
 	return middleware.NewMiddleware("template", _type, priority, func(d driver.Driver) driver.Driver {
-		return &driverImpl{Driver: d, getTmpl: getTmpl}
+		return &driverImpl{Driver: d, Getter: getter}
 	})
 }
 
 type driverImpl struct {
 	driver.Driver
-	getTmpl Getter
+	Getter
 }
 
 func (d *driverImpl) Send(c context.Context, m driver.Message) (err error) {
@@ -66,10 +80,10 @@ func (d *driverImpl) render(c context.Context, name string,
 		return "", Error{}
 	}
 
-	tmpl, err := d.getTmpl(c, name)
+	tmpl, ok, err := d.GetTemplate(c, name)
 	if err != nil {
 		return "", Error{TmplName: name, error: err}
-	} else if tmpl.Tmpl == "" {
+	} else if !ok {
 		return "", Error{TmplName: name}
 	}
 
