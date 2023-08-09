@@ -18,6 +18,8 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+
+	"github.com/xgfone/go-msgnotice/driver"
 )
 
 type ctxtype uint8
@@ -157,7 +159,7 @@ func (m *Mapping) GetAll() (driverType2ChannelNames map[string]string) {
 // GetDefaultChannelName extracts the driver type from the context
 // by using GetDriverTypeFromContext and returns the channel name
 // mapped by the driver type.
-func (m *Mapping) GetDefaultChannelName(c context.Context, _ map[string]interface{}) (string, error) {
+func (m *Mapping) GetDefaultChannelName(c context.Context, _ driver.Message) (string, error) {
 	if dtype := GetDriverTypeFromContext(c); len(dtype) > 0 {
 		return m.Get(dtype), nil
 	}

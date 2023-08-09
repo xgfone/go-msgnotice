@@ -49,7 +49,7 @@ type Manager struct {
 	// the default channel name.
 	//
 	// Default: use DefaultChannels.GetDefaultChannelName
-	GetDefaultChannelName func(c context.Context, metadata map[string]interface{}) (string, error)
+	GetDefaultChannelName func(context.Context, driver.Message) (string, error)
 
 	clock    sync.RWMutex
 	chmap    map[string]*channel.Channel // for channels
@@ -170,9 +170,9 @@ func (m *Manager) BuildAndUpsertChannels(channels ...channel.Channel) error {
 func (m *Manager) SendWithChannel(ctx context.Context, channelName string, msg driver.Message) (err error) {
 	if channelName == "" {
 		if m.GetDefaultChannelName != nil {
-			channelName, err = m.GetDefaultChannelName(ctx, msg.Metadata)
+			channelName, err = m.GetDefaultChannelName(ctx, msg)
 		} else {
-			channelName, err = DefaultChannels.GetDefaultChannelName(ctx, msg.Metadata)
+			channelName, err = DefaultChannels.GetDefaultChannelName(ctx, msg)
 		}
 
 		if err != nil {
