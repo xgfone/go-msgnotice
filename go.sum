@@ -1,6 +1,2 @@
 github.com/knadh/smtppool v1.0.2 h1:qg2A2DYqrfeCxxAonVaL9xruhIP+e7xhq+TImyiLajQ=
 github.com/knadh/smtppool v1.0.2/go.mod h1:3DJHouXAgPDBz0kC50HukOsdapYSwIEfJGwuip46oCA=
-github.com/xgfone/go-defaults v0.2.0 h1:1/k2GdF3X2HzBWtOu/jaLgK6E+7gd4Nq4q6rEzBl2mU=
-github.com/xgfone/go-defaults v0.2.0/go.mod h1:zwcnD8escc6E5QrCNKRLQddb4/hcUnUOM20kUeki18Y=
-github.com/xgfone/go-sqlx v0.25.0 h1:ce1V1aWhrbZsuoA25nK7yeCPxJ1Ux1rCDhmvixN2MPw=
-github.com/xgfone/go-sqlx v0.25.0/go.mod h1:5NZIKj1Z8DfCUUiLl8zrvFAiRKwqmXKt8cVZbrlwRP4=

@@ -46,7 +46,3 @@ debug_test
 # hidden files
 .*
 _*
-
-# App
-msgnotice
-cmd/

@@ -1,15 +1,18 @@
 # A Common Message Notice Library [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-msgnotice)](https://pkg.go.dev/github.com/xgfone/go-msgnotice) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-msgnotice/master/LICENSE)
 
-A common message notice library supporting `Go1.18+`.
+A common message notice library supporting `Go1.15+`.
 
 
 ## Example
+The sub-module `cmd/msgnotice` can be used. Or rewrite it as follow.
+
 ```go
 package main
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -27,7 +30,6 @@ import (
 	"github.com/xgfone/go-msgnotice/driver/middleware"
 	"github.com/xgfone/go-msgnotice/driver/middleware/logger"
 	"github.com/xgfone/go-msgnotice/driver/middleware/template"
-	"github.com/xgfone/go-msgnotice/storage/file"
 )
 
 var (
@@ -50,14 +52,62 @@ func newDriverMiddleware(_name, _type string, _prio int) middleware.Middleware {
 	})
 }
 
+func _loadFromFile(filepath string, dst interface{}, cb func() error) (err error) {
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = nil
+		}
+		return
+	} else if len(data) == 0 {
+		return
+	}
+
+	if err = json.Unmarshal(data, dst); err != nil {
+		return
+	}
+
+	return cb()
+}
+
+func _loadTemplatesFromFile(filepath string) (templates []template.Template, err error) {
+	err = _loadFromFile(filepath, &templates, func() error {
+		for _, tmpl := range templates {
+			if tmpl.Name == "" || tmpl.Tmpl == "" {
+				return errors.New("template misses the name or content")
+			}
+		}
+		return nil
+	})
+	return
+}
+
 func initDriverMiddlewares() (err error) {
-	tmplStorage, err := file.NewTemplateStorage(*templatesfile)
+	var templates []template.Template
+	err = _loadFromFile(*templatesfile, &templates, func() error {
+		for _, tmpl := range templates {
+			if tmpl.Name == "" || tmpl.Tmpl == "" {
+				return errors.New("template misses the name or content")
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return
 	}
 
+	getTmpl := func(c context.Context, name string) (t template.Template, ok bool, err error) {
+		for _, tmpl := range templates {
+			if tmpl.Name == name {
+				return tmpl, true, nil
+			}
+		}
+		err = fmt.Errorf("no template named '%s'", name)
+		return
+	}
+
 	// For Common middlewares
-	middleware.DefaultManager.Use(logger.New("", 0), template.New("", 10, tmplStorage.GetTemplate))
+	middleware.DefaultManager.Use(logger.New("", 0), template.New("", 10, template.GetterFunc(getTmpl)))
 
 	// Only for Email middleware
 	middleware.DefaultManager.Use(newDriverMiddleware("email", "email", 20))
@@ -69,12 +119,18 @@ func initDriverMiddlewares() (err error) {
 }
 
 func initChannels() (err error) {
-	channelStorage, err := file.NewChannelStorage(*channelsfile)
+	var channels []channel.Channel
+	err = _loadFromFile(*channelsfile, &channels, func() error {
+		for _, channel := range channels {
+			if channel.DriverName == "" {
+				return fmt.Errorf("the driver name of channel named '%s' must not be empty", channel.ChannelName)
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return
 	}
-
-	channels, _ := channelStorage.GetChannels(context.Background(), 0, 0)
 	return manager.Default.BuildAndUpsertChannels(channels...)
 }
 
@@ -142,7 +198,7 @@ func main() {
 ```
 
 ```json
-// Templates configuration file: template.json
+// Templates configuration file: templates.json
 [
     {
         "Name": "hello",
