@@ -42,13 +42,14 @@ func logevent(e Event) {
 	if LogEvent != nil {
 		LogEvent(e)
 	} else {
-		var cname string
+		var cname, dname string
 		if e.Channel != nil {
 			cname = e.Channel.ChannelName
+			dname = e.Channel.DriverName
 		}
 
-		log.Printf("channel=%s, title=%s, content=%s, receivers=%s, metadata=%v, start=%d, cost=%s, err=%v",
-			cname, e.Title, e.Content, e.Receiver, e.Metadata, e.Start.Unix(), time.Since(e.Start), e.Err)
+		log.Printf("channel=%s, driver=%s, title=%s, content=%s, receivers=%s, metadata=%v, start=%d, cost=%s, err=%v",
+			cname, dname, e.Title, e.Content, e.Receiver, e.Metadata, e.Start.Unix(), time.Since(e.Start), e.Err)
 	}
 }
 
