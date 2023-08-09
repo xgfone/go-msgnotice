@@ -58,10 +58,10 @@ type Manager struct {
 
 // NewManager returns a new channel manager.
 //
-// If the driver middleware manager is nil, new one.
+// If the driver middleware manager is nil, use middleware.DefaultManager.
 func NewManager(driverMiddlewareManager *middleware.Manager) *Manager {
 	if driverMiddlewareManager == nil {
-		driverMiddlewareManager = middleware.NewManager(nil)
+		driverMiddlewareManager = middleware.DefaultManager
 	}
 
 	m := &Manager{
@@ -181,6 +181,7 @@ func (m *Manager) SendWithChannel(ctx context.Context, channelName string, msg d
 	}
 
 	if ch, ok := m.getChannels()[channelName]; ok {
+		channel.SetChannelIntoContext(ctx, ch)
 		err = ch.Send(ctx, msg)
 	} else {
 		err = channel.NoChannelError(channelName)
