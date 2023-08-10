@@ -70,18 +70,6 @@ func _loadFromFile(filepath string, dst interface{}, cb func() error) (err error
 	return cb()
 }
 
-func _loadTemplatesFromFile(filepath string) (templates []template.Template, err error) {
-	err = _loadFromFile(filepath, &templates, func() error {
-		for _, tmpl := range templates {
-			if tmpl.Name == "" || tmpl.Tmpl == "" {
-				return errors.New("template misses the name or content")
-			}
-		}
-		return nil
-	})
-	return
-}
-
 func initDriverMiddlewares() (err error) {
 	var templates []template.Template
 	err = _loadFromFile(*templatesfile, &templates, func() error {
