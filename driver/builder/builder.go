@@ -20,7 +20,6 @@ import "github.com/xgfone/go-msgnotice/driver"
 // Builder is used to build a driver with the config.
 type Builder interface {
 	Name() string
-	Type() string
 	Build(config map[string]interface{}) (driver.Driver, error)
 }
 
@@ -28,16 +27,14 @@ type Builder interface {
 type BuilderFunc func(map[string]interface{}) (driver.Driver, error)
 
 // New returns a new driver builder.
-func New(name, _type string, build BuilderFunc) Builder {
-	return builder{name: name, _type: _type, build: build}
+func New(name string, build BuilderFunc) Builder {
+	return builder{name: name, build: build}
 }
 
 type builder struct {
 	name  string
-	_type string
 	build BuilderFunc
 }
 
 func (b builder) Name() string                                          { return b.name }
-func (b builder) Type() string                                          { return b._type }
 func (b builder) Build(c map[string]interface{}) (driver.Driver, error) { return b.build(c) }

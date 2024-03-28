@@ -27,17 +27,17 @@ type Filter func(context.Context, driver.Message) (filter bool, err error)
 
 // New returns a new middleware to stop to send the message
 // if the filter returns true or an error.
-func New(_type string, priority int, filter Filter) middleware.Middleware {
+func New(priority int, driverType string, filter Filter) middleware.Middleware {
 	if filter == nil {
 		panic("the filter must not be nil")
 	}
 
-	return middleware.NewMiddleware("filter", _type, priority, func(d driver.Driver) driver.Driver {
-		return driver.New(func(c context.Context, m driver.Message) error {
+	return middleware.New("filter", priority, func(d driver.Driver) driver.Driver {
+		return driver.MatchAndWrap(driverType, d, func(c context.Context, m driver.Message, d driver.Driver) error {
 			if filter, err := filter(c, m); err != nil || filter {
 				return err
 			}
 			return d.Send(c, m)
-		}, d.Stop)
+		})
 	})
 }

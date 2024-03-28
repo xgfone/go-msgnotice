@@ -24,16 +24,16 @@ import (
 )
 
 // New returns a new timeout middleware to set the context timeout.
-func New(_type string, priority int, timeout time.Duration) middleware.Middleware {
+func New(priority int, driverType string, timeout time.Duration) middleware.Middleware {
 	if timeout <= 0 {
 		panic("the timeout must be a positive")
 	}
 
-	return middleware.NewMiddleware("timeout", _type, priority, func(d driver.Driver) driver.Driver {
-		return driver.New(func(c context.Context, m driver.Message) error {
+	return middleware.New("timeout", priority, func(d driver.Driver) driver.Driver {
+		return driver.MatchAndWrap(driverType, d, func(c context.Context, m driver.Message, d driver.Driver) error {
 			c, cancel := context.WithTimeout(c, timeout)
 			defer cancel()
 			return d.Send(c, m)
-		}, d.Stop)
+		})
 	})
 }

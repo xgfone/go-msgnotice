@@ -33,7 +33,7 @@ import (
 // DriverType represents the driver type "email".
 const DriverType = "email"
 
-func init() { builder.NewAndRegister(DriverType, DriverType, New) }
+func init() { builder.NewAndRegister(DriverType, New) }
 
 // New returns a new driver, which sends the message by the html email,
 // which is registered as the driver builder with name "email"
@@ -211,7 +211,10 @@ type driverImpl struct {
 	from string
 }
 
+func (d driverImpl) Type() string { return DriverType }
+
 func (d driverImpl) Stop() { d.pool.Close() }
+
 func (d driverImpl) Send(c context.Context, m driver.Message) error {
 	var mail smtppool.Email
 	mail.From = d.from

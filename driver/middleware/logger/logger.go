@@ -54,14 +54,20 @@ func logevent(e Event) {
 }
 
 // New returns a new logger middleware to log the sent message.
-func New(_type string, priority int) middleware.Middleware {
-	return middleware.NewMiddleware("logger", _type, priority, func(d driver.Driver) driver.Driver {
-		return driver.New(func(c context.Context, m driver.Message) error {
+func New(priority int, driverType string) middleware.Middleware {
+	return middleware.New("logger", priority, func(d driver.Driver) driver.Driver {
+		return driver.MatchAndWrap(driverType, d, func(c context.Context, m driver.Message, d driver.Driver) error {
 			start := time.Now()
 			err := d.Send(c, m)
-			ch := channel.GetChannelFromContext(c)
+
+			var ch *channel.Channel
+			channel, ok := channel.GetChannelFromContext(c)
+			if ok {
+				ch = &channel
+			}
+
 			logevent(Event{Channel: ch, Message: m, Start: start, Err: err})
 			return err
-		}, d.Stop)
+		})
 	})
 }

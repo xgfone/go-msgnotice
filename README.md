@@ -4,8 +4,6 @@ A common message notice library supporting `Go1.15+`.
 
 
 ## Example
-The sub-module `cmd/msgnotice` can be used. Or rewrite it as follow.
-
 ```go
 package main
 
@@ -33,21 +31,21 @@ import (
 )
 
 var (
-	listenaddr    = flag.String("listenaddr", ":80", "The address to listen on.")
+	listenaddr    = flag.String("listenaddr", "127.0.0.1:80", "The address to listen on.")
 	channelsfile  = flag.String("channelsfile", "channels.json", "The file path storing the channels.")
 	templatesfile = flag.String("templatesfile", "templates.json", "The file path storing the templates.")
 )
 
 func wrapDriver(_name, _type string, _driver driver.Driver) driver.Driver {
-	return driver.NewDriver(func(c context.Context, m driver.Message) error {
+	return driver.MatchAndWrap(_type, _driver, func(c context.Context, m driver.Message, d driver.Driver) error {
 		log.Printf("middleware=%s, type=%s, title=%s, content=%s, receiver=%s",
 			_name, _type, m.Title, m.Content, m.Receiver)
 		return _driver.Send(c, m)
-	}, _driver.Stop)
+	})
 }
 
 func newDriverMiddleware(_name, _type string, _prio int) middleware.Middleware {
-	return middleware.NewMiddleware(_name, _type, _prio, func(d driver.Driver) driver.Driver {
+	return middleware.New(_name, _prio, func(d driver.Driver) driver.Driver {
 		return wrapDriver(_name, _type, d)
 	})
 }
@@ -95,7 +93,7 @@ func initDriverMiddlewares() (err error) {
 	}
 
 	// For Common middlewares
-	middleware.DefaultManager.Use(logger.New("", 0), template.New("", 10, template.GetterFunc(getTmpl)))
+	middleware.DefaultManager.Use(logger.New(0, ""), template.New(10, "", template.GetterFunc(getTmpl)))
 
 	// Only for Email middleware
 	middleware.DefaultManager.Use(newDriverMiddleware("email", "email", 20))
@@ -108,18 +106,20 @@ func initDriverMiddlewares() (err error) {
 
 func initChannels() (err error) {
 	var channels []channel.Channel
-	err = _loadFromFile(*channelsfile, &channels, func() error {
-		for _, channel := range channels {
-			if channel.DriverName == "" {
-				return fmt.Errorf("the driver name of channel named '%s' must not be empty", channel.ChannelName)
+	err = _loadFromFile(*channelsfile, &channels, func() (err error) {
+		for i, channel := range channels {
+			channels[i], err = channel.Init()
+			if err != nil {
+				return
 			}
 		}
-		return nil
-	})
-	if err != nil {
 		return
+	})
+
+	if err == nil {
+		manager.Default.UpsertChannels(channels...)
 	}
-	return manager.Default.BuildAndUpsertChannels(channels...)
+	return
 }
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
@@ -181,7 +181,7 @@ func main() {
 	}
 
 	http.HandleFunc("/message", httpHandler)
-	http.ListenAndServe(*listenaddr, nil)
+	_ = http.ListenAndServe(*listenaddr, nil)
 }
 ```
 

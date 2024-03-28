@@ -16,78 +16,77 @@
 package middleware
 
 import (
+	"fmt"
+	"sort"
+
 	"github.com/xgfone/go-msgnotice/driver"
 )
 
-// Middleware is the common driver middleware.
+// Middleware is used to wrap a driver and return a new one.
 type Middleware interface {
-	// Name returns the name of the middleware.
-	Name() string
-
-	// Type returns the type of the middleware, which only apply the driver
-	// of the specific type.
-	//
-	// If empty, represents the common middleware and maybe apply any drivers.
-	Type() string
-
-	// The smaller the value, the higher the priority and the middleware
-	// is executed preferentially.
-	Priority() int
-
-	// WrapDriver is used to wrap the driver and returns a new one.
-	WrapDriver(wrappedDriver driver.Driver) (newDriver driver.Driver)
+	Driver(driver.Driver) driver.Driver
 }
 
 type middleware struct {
-	name     string
-	_type    string
-	priority int
-	driver   func(driver.Driver) driver.Driver
+	name   string
+	prio   int
+	driver func(driver.Driver) driver.Driver
 }
 
-func (m middleware) Name() string                             { return m.name }
-func (m middleware) Type() string                             { return m._type }
-func (m middleware) Priority() int                            { return m.priority }
-func (m middleware) WrapDriver(d driver.Driver) driver.Driver { return m.driver(d) }
+func (m middleware) Name() string                         { return m.name }
+func (m middleware) Priority() int                        { return m.prio }
+func (m middleware) Driver(d driver.Driver) driver.Driver { return m.driver(d) }
 
-// NewMiddleware returns a new common driver middleware.
-func NewMiddleware(name, _type string, prio int, f func(driver.Driver) driver.Driver) Middleware {
-	return middleware{name: name, _type: _type, priority: prio, driver: f}
+func (m middleware) String() string {
+	return fmt.Sprintf("Middleware(name=%s, priority=%d)", m.name, m.prio)
 }
 
-// Middlewares is a group of the common driver middlewares.
+// New returns a new driver middleware with the name and  priority.
+func New(name string, prio int, f func(driver.Driver) driver.Driver) Middleware {
+	return middleware{name: name, prio: prio, driver: f}
+}
+
+// Sort sorts a set of middlewares by the priority from high to low.
+func Sort(middlewares []Middleware) {
+	sort.SliceStable(middlewares, func(i, j int) bool {
+		return getprio(middlewares[i]) > getprio(middlewares[j])
+	})
+}
+
+func getprio(m Middleware) int {
+	if p, ok := m.(interface{ Priority() int }); ok {
+		return p.Priority()
+	}
+	return 0
+}
+
+/// ----------------------------------------------------------------------- ///
+
+var _ Middleware = Middlewares(nil)
+
 type Middlewares []Middleware
 
-func (ms Middlewares) Len() int           { return len(ms) }
-func (ms Middlewares) Swap(i, j int)      { ms[i], ms[j] = ms[j], ms[i] }
-func (ms Middlewares) Less(i, j int) bool { return ms[i].Priority() < ms[j].Priority() }
+// Sort sorts itself by the priority from high to low.
+func (ms Middlewares) Sort() { Sort(ms) }
 
-// WrapDriver is equal to ms.WrapDriverWithType("", driver).
-func (ms Middlewares) WrapDriver(driver driver.Driver) driver.Driver {
-	return ms.WrapDriverWithType("", driver)
+// Clone clones itself and returns a new one.
+func (ms Middlewares) Clone() Middlewares {
+	return append(Middlewares(nil), ms...)
 }
 
-// WrapDriverWithType wraps the driver with the middlewares of the specific type
-// and returns a new one.
-//
-// if _type is empty, apply all the middlewares to the given driver.
-func (ms Middlewares) WrapDriverWithType(_type string, driver driver.Driver) driver.Driver {
-	if driver == nil {
-		return nil
+// Append appends the new middlewares.
+func (ms Middlewares) Append(news ...Middleware) Middlewares {
+	return append(ms, news...)
+}
+
+// Driver implements the interface Middleware.
+func (ms Middlewares) Driver(d driver.Driver) driver.Driver {
+	if d == nil {
+		return d
 	}
 
 	for _len := len(ms) - 1; _len >= 0; _len-- {
-		if mt := ms[_len].Type(); mt == "" || _type == "" || mt == _type {
-			driver = ms[_len].WrapDriver(driver)
-		}
+		d = ms[_len].Driver(d)
 	}
-	return driver
-}
-
-// Clone clones itself and appends the new middlewares to the new.
-func (ms Middlewares) Clone(news ...Middleware) Middlewares {
-	mws := make(Middlewares, len(ms)+len(news))
-	copy(mws, ms)
-	copy(mws[len(ms):], news)
-	return mws
+	return d
 }

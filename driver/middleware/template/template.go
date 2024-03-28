@@ -53,8 +53,11 @@ func (f GetterFunc) GetTemplate(c context.Context, name string) (Template, bool,
 
 // New returns a new template middleware to render the content
 // from a given template with the arguments.
-func New(_type string, priority int, getter Getter) middleware.Middleware {
-	return middleware.NewMiddleware("template", _type, priority, func(d driver.Driver) driver.Driver {
+func New(priority int, driverType string, getter Getter) middleware.Middleware {
+	return middleware.New("template", priority, func(d driver.Driver) driver.Driver {
+		if !driver.Match(d, driverType) {
+			return d
+		}
 		return &driverImpl{Driver: d, Getter: getter}
 	})
 }

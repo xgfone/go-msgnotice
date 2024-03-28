@@ -1,4 +1,4 @@
-// Copyright 2023 xgfone
+// Copyright 2024 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package drivers is used to store the drivers to register them
-// when importing the package.
-package drivers
+package middleware
 
-//go:generate msgnotice_init_drivers
+import (
+	"fmt"
+	"testing"
+
+	"github.com/xgfone/go-msgnotice/driver"
+)
+
+func TestMiddlewaresSort(t *testing.T) {
+	noop := func(d driver.Driver) driver.Driver { return d }
+	ms := Middlewares{
+		New("m1", 1, noop),
+		New("m4", 3, noop),
+		New("m3", 3, noop),
+		New("m2", 2, noop),
+	}
+	ms.Sort()
+
+	for i, m := range ms {
+		name := m.(interface{ Name() string }).Name()
+		if expect := fmt.Sprintf("m%d", 4-i); expect != name {
+			t.Errorf("expect middleware '%s', but got '%s'", expect, name)
+		}
+	}
+}

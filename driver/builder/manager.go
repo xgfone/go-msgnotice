@@ -27,15 +27,8 @@ var (
 )
 
 // NewAndRegister news the driver builder and register it.
-func NewAndRegister(name, _type string, build BuilderFunc) {
-	Register(New(name, _type, build))
-}
-
-// NewAndRegisterFromSender news the driver builder from the sender and register it.
-func NewAndRegisterFromSender(name, _type string, sender driver.Sender) {
-	Register(New(name, _type, func(map[string]interface{}) (driver.Driver, error) {
-		return sender, nil
-	}))
+func NewAndRegister(name string, build BuilderFunc) {
+	Register(New(name, build))
 }
 
 // Register registers the driver builder.
@@ -76,11 +69,11 @@ func Gets() []Builder {
 }
 
 // Build looks up the builder by the name and build the driver with the config.
-func Build(name string, config map[string]interface{}) (_type string, driver driver.Driver, err error) {
-	if builder := Get(name); builder == nil {
+func Build(name string, config map[string]interface{}) (driver driver.Driver, err error) {
+	if builder := Get(name); builder != nil {
+		driver, err = builder.Build(config)
+	} else {
 		err = fmt.Errorf("no driver builder named '%s'", name)
-	} else if driver, err = builder.Build(config); err == nil {
-		_type = builder.Type()
 	}
 	return
 }

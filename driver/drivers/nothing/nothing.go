@@ -22,11 +22,11 @@ import (
 	"github.com/xgfone/go-msgnotice/driver/builder"
 )
 
-func init() { builder.NewAndRegister("nothing", "nothing", New) }
+func init() { builder.NewAndRegister("nothing", New) }
 
 // New returns a new driver, which outputs the message to stdout.
 func New(_ map[string]interface{}) (driver.Driver, error) {
-	return driver.Sender(func(c context.Context, m driver.Message) error {
+	return driver.New("nothing", func(c context.Context, m driver.Message) error {
 		return nil
-	}), nil
+	}, nil), nil
 }

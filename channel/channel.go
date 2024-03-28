@@ -30,18 +30,18 @@ var channelkey = ctxkey(123)
 
 // SetChannelIntoContext sets the channel into the context
 // and returns the new context.
-func SetChannelIntoContext(ctx context.Context, channel *Channel) context.Context {
+func SetChannelIntoContext(ctx context.Context, channel Channel) context.Context {
 	return context.WithValue(ctx, channelkey, channel)
 }
 
 // GetChannelFromContext returns the channel from the context.
 //
 // Return nil if the context don't has the channel.
-func GetChannelFromContext(ctx context.Context) *Channel {
+func GetChannelFromContext(ctx context.Context) (Channel, bool) {
 	if v := ctx.Value(channelkey); v != nil {
-		return v.(*Channel)
+		return v.(Channel), true
 	}
-	return nil
+	return Channel{}, false
 }
 
 // ErrNoChannel is used to represent the error that the channel does not exist.
@@ -60,7 +60,6 @@ type Sender func(ctx context.Context, channelName string, msg driver.Message) er
 type Channel struct {
 	ChannelName string
 	DriverName  string
-	DriverType  string
 	DriverConf  map[string]interface{}
 	IsDefault   bool
 
@@ -68,23 +67,16 @@ type Channel struct {
 }
 
 // New returns a new channel.
-func New(channelName, driverName string, driverConf map[string]interface{}) (*Channel, error) {
-	driverType, driver, err := builder.Build(driverName, driverConf)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Channel{
+func New(channelName, driverName string, driverConf map[string]interface{}) (Channel, error) {
+	return (Channel{
 		ChannelName: channelName,
 		DriverName:  driverName,
-		DriverType:  driverType,
 		DriverConf:  driverConf,
-		Driver:      driver,
-	}, nil
+	}).Init()
 }
 
 // Must is the same as New, but panics if there is an error.
-func Must(channelName, driverName string, driverConf map[string]interface{}) *Channel {
+func Must(channelName, driverName string, driverConf map[string]interface{}) Channel {
 	channel, err := New(channelName, driverName, driverConf)
 	if err != nil {
 		panic(err)
@@ -92,7 +84,30 @@ func Must(channelName, driverName string, driverConf map[string]interface{}) *Ch
 	return channel
 }
 
-func (c *Channel) String() string {
+// Init initializes itself and returns a new one.
+func (c Channel) Init() (new Channel, err error) {
+	switch {
+	case c.ChannelName == "" && c.DriverName == "":
+		err = errors.New("missing the channel name and driver name")
+		return
+
+	case c.ChannelName == "":
+		c.ChannelName = c.DriverName
+
+	case c.DriverName == "":
+		c.DriverName = c.ChannelName
+	}
+
+	c.Driver, err = builder.Build(c.DriverName, c.DriverConf)
+	if err != nil {
+		return
+	}
+
+	new = c
+	return
+}
+
+func (c Channel) String() string {
 	if c.ChannelName == "" {
 		return fmt.Sprintf("Channel(driver=%s)", c.DriverName)
 	}
@@ -106,7 +121,7 @@ var _ driver.Driver = new(Channel)
 // Notice: it will put the channel itself into the context ctx
 // by SetChannelIntoContext, which can be got out from the context
 // by GetChannelFromContext.
-func (c *Channel) Send(ctx context.Context, m driver.Message) error {
+func (c Channel) Send(ctx context.Context, m driver.Message) error {
 	return c.Driver.Send(SetChannelIntoContext(ctx, c), m)
 }
 
