@@ -56,10 +56,10 @@ func (s Sender) Send(c context.Context, m Message) error { return s(c, m) }
 // Stop implements the interface Driver#Stop, which does nothing.
 func (s Sender) Stop() {}
 
-// NewDriver returns a new driver from the send and stop functions.
+// New returns a new driver from the send and stop functions.
 //
 // If stop is nil, Driver#Stop does nothing.
-func NewDriver(send Sender, stop func()) Driver {
+func New(send Sender, stop func()) Driver {
 	if send == nil {
 		panic("the driver send function must not be nil")
 	}

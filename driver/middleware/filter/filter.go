@@ -33,7 +33,7 @@ func New(_type string, priority int, filter Filter) middleware.Middleware {
 	}
 
 	return middleware.NewMiddleware("filter", _type, priority, func(d driver.Driver) driver.Driver {
-		return driver.NewDriver(func(c context.Context, m driver.Message) error {
+		return driver.New(func(c context.Context, m driver.Message) error {
 			if filter, err := filter(c, m); err != nil || filter {
 				return err
 			}

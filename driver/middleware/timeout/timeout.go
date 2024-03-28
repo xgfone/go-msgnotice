@@ -30,7 +30,7 @@ func New(_type string, priority int, timeout time.Duration) middleware.Middlewar
 	}
 
 	return middleware.NewMiddleware("timeout", _type, priority, func(d driver.Driver) driver.Driver {
-		return driver.NewDriver(func(c context.Context, m driver.Message) error {
+		return driver.New(func(c context.Context, m driver.Message) error {
 			c, cancel := context.WithTimeout(c, timeout)
 			defer cancel()
 			return d.Send(c, m)
