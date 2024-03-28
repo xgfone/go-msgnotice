@@ -25,6 +25,7 @@ var ErrNoDriver = errors.New("no driver")
 
 // Message is the message information.
 type Message struct {
+	Type     string
 	Title    string
 	Content  string
 	Receiver string
@@ -32,8 +33,9 @@ type Message struct {
 }
 
 // NewMessage returns a message witht the given information.
-func NewMessage(receiver, title, content string, metadata map[string]interface{}) Message {
+func NewMessage(mtype, receiver, title, content string, metadata map[string]interface{}) Message {
 	return Message{
+		Type:     mtype,
 		Title:    title,
 		Content:  content,
 		Receiver: receiver,
