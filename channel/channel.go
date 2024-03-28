@@ -67,8 +67,8 @@ type Channel struct {
 	driver.Driver `json:"-" yaml:"-" sql:"-" xml:"-"`
 }
 
-// NewChannel returns a new channel.
-func NewChannel(channelName, driverName string, driverConf map[string]interface{}) (*Channel, error) {
+// New returns a new channel.
+func New(channelName, driverName string, driverConf map[string]interface{}) (*Channel, error) {
 	driverType, driver, err := builder.Build(driverName, driverConf)
 	if err != nil {
 		return nil, err
@@ -83,9 +83,9 @@ func NewChannel(channelName, driverName string, driverConf map[string]interface{
 	}, nil
 }
 
-// MustNewChannel returns a new channel and panics if there is an error.
-func MustNewChannel(channelName, driverName string, driverConf map[string]interface{}) *Channel {
-	channel, err := NewChannel(channelName, driverName, driverConf)
+// Must is the same as New, but panics if there is an error.
+func Must(channelName, driverName string, driverConf map[string]interface{}) *Channel {
+	channel, err := New(channelName, driverName, driverConf)
 	if err != nil {
 		panic(err)
 	}

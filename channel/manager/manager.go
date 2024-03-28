@@ -38,7 +38,7 @@ type NewChannelFunc func(channelName, driverName string, driverConf map[string]i
 type Manager struct {
 	// NewChannel is used to create a new channel.
 	//
-	// Default: channel.NewChannel
+	// Default: channel.New
 	NewChannel NewChannelFunc
 
 	// DriverMiddlewares is used to manage the middlewares of the channel drivers.
@@ -66,7 +66,7 @@ func NewManager(driverMiddlewareManager *middleware.Manager) *Manager {
 
 	m := &Manager{
 		chmap:             make(map[string]*channel.Channel, 16),
-		NewChannel:        channel.NewChannel,
+		NewChannel:        channel.New,
 		DriverMiddlewares: driverMiddlewareManager,
 	}
 
