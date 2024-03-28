@@ -110,11 +110,11 @@ func (c *Channel) Send(ctx context.Context, m driver.Message) error {
 	return c.Driver.Send(SetChannelIntoContext(ctx, c), m)
 }
 
-// NoChannelError represents the error that there is not the given channel.
-type NoChannelError struct {
+// NotExistError represents the error that there is not the given channel.
+type NotExistError struct {
 	Channel string
 }
 
-func (e NoChannelError) Error() string {
+func (e NotExistError) Error() string {
 	return fmt.Sprintf("no channel named '%s'", e.Channel)
 }
