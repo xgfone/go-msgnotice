@@ -184,7 +184,7 @@ func (m *Manager) SendWithChannel(ctx context.Context, channelName string, msg d
 		channel.SetChannelIntoContext(ctx, ch)
 		err = ch.Send(ctx, msg)
 	} else {
-		err = channel.NoChannelError(channelName)
+		err = channel.NoChannelError{Channel: channelName}
 	}
 
 	return
