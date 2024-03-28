@@ -22,31 +22,6 @@ import (
 	"github.com/xgfone/go-msgnotice/driver"
 )
 
-type ctxtype uint8
-
-const ctxkeydrivertype = ctxtype(255)
-
-// GetDriverTypeFromContext extracts and returns the driver type from the context.
-//
-// If no the driver type, return "".
-func GetDriverTypeFromContext(c context.Context) string {
-	if v := c.Value(ctxkeydrivertype); v != nil {
-		return v.(string)
-	}
-	return ""
-}
-
-// SetDriverTypeIntoContext sets the driver type into the context,
-// and returns the new context.
-//
-// Notice: if driverType is empty, do nothing and return the original context.
-func SetDriverTypeIntoContext(c context.Context, driverType string) context.Context {
-	if driverType == "" {
-		return c
-	}
-	return context.WithValue(c, ctxkeydrivertype, driverType)
-}
-
 // DefaultChannels is the global default channels.
 var DefaultChannels = NewMapping()
 
@@ -156,12 +131,12 @@ func (m *Mapping) GetAll() (driverType2ChannelNames map[string]string) {
 	return
 }
 
-// GetDefaultChannelName extracts the driver type from the context
-// by using GetDriverTypeFromContext and returns the channel name
-// mapped by the driver type.
-func (m *Mapping) GetDefaultChannelName(c context.Context, _ driver.Message) (string, error) {
-	if dtype := GetDriverTypeFromContext(c); len(dtype) > 0 {
-		return m.Get(dtype), nil
+// GetDefaultChannelName returns the channel name mapped by the driver type.
+//
+// NOTICE: the message type is used as the driver type if not empty.
+func (m *Mapping) GetDefaultChannelName(c context.Context, dm driver.Message) (string, error) {
+	if len(dm.Type) > 0 {
+		return m.Get(dm.Type), nil
 	}
 	return "", nil
 }
