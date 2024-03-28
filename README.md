@@ -160,7 +160,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 	}
 
-	msg := driver.NewMessage(req.Receiver, req.Title, req.Content, req.Metadata)
+	msg := driver.NewMessage("", req.Receiver, req.Title, req.Content, req.Metadata)
 	err := channel.Send(ctx, req.Channel, msg)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
