@@ -17,7 +17,6 @@ package manager
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -89,14 +88,14 @@ func (m *Manager) getChannels() map[string]*channel.Channel {
 // AddChannel adds the channel with the name into the global cache.
 //
 // Notice: it will apply the driver middlewares to the channel driver.
-func (m *Manager) AddChannel(channel *channel.Channel) (err error) {
+func (m *Manager) AddChannel(ch *channel.Channel) (err error) {
 	m.clock.Lock()
 	defer m.clock.Unlock()
-	if _, ok := m.chmap[channel.ChannelName]; ok {
-		err = fmt.Errorf("channel named '%s' has been added", channel.ChannelName)
+	if _, ok := m.chmap[ch.ChannelName]; ok {
+		err = channel.ExistError{Channel: ch.ChannelName}
 	} else {
-		channel.Driver = m.DriverMiddlewares.WrapDriverWithType(channel.DriverType, channel.Driver)
-		m.chmap[channel.ChannelName] = channel
+		ch.Driver = m.DriverMiddlewares.WrapDriverWithType(ch.DriverType, ch.Driver)
+		m.chmap[ch.ChannelName] = ch
 		m.updateChannels()
 	}
 
