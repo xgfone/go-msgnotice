@@ -195,8 +195,9 @@ func New(config map[string]interface{}) (driver.Driver, error) {
 		MaxConns:        maxconnnum,
 		IdleTimeout:     idleTimeout,
 		PoolWaitTimeout: timeout,
-		// TLSConfig: nil,
-		// SSL: false,
+
+		TLSConfig: nil,
+		SSL:       forceTLS,
 	}
 	pool, err := smtppool.New(opt)
 	if err != nil {
