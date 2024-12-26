@@ -1,9 +1,12 @@
-# A Common Message Notice Library [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-msgnotice)](https://pkg.go.dev/github.com/xgfone/go-msgnotice) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-msgnotice/master/LICENSE)
+# A Common Message Notice Library
 
-A common message notice library supporting `Go1.15+`.
-
+[![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-msgnotice)](https://pkg.go.dev/github.com/xgfone/go-msgnotice)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-msgnotice/master/LICENSE)
+![Minimum Go Version](https://img.shields.io/github/go-mod/go-version/xgfone/go-msgnotice?label=Go%2B)
+![Latest SemVer](https://img.shields.io/github/v/tag/xgfone/go-msgnotice?sort=semver)
 
 ## Example
+
 ```go
 package main
 
