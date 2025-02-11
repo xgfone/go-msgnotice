@@ -34,8 +34,8 @@ func init() { builder.NewAndRegister(DriverTypeWebhook, NewWebhook) }
 // The optional secret is extracted from the message metadata by name "secret".
 func NewWebhook(config map[string]any) (driver.Driver, error) {
 	var secrets map[string]string
-	if len(config) >= 0 {
-		_secrets, ok := config["secrets"].(map[string]any)
+	if _config := config["secrets"]; _config != nil {
+		_secrets, ok := _config.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("secrets is %T, not map[string]any", config["secrets"])
 		}
