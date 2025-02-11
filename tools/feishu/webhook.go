@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package webhook privides the webhook function to send the feishu messages.
-package webhook
+package feishu
 
 import (
 	"bytes"
@@ -25,7 +24,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,33 +31,49 @@ import (
 	"github.com/xgfone/go-toolkit/unsafex"
 )
 
-// DefaultBaseURL is the default base url for webhook.
-const DefaultBaseURL = "https://open.feishu.cn/open-apis/bot/v2/hook/"
+const webhookBaseURL = "https://open.feishu.cn/open-apis/bot/v2/hook/"
 
 // Webhook is a webhook to send the feishu message.
 type Webhook struct {
 	do func(*http.Request) (*http.Response, error)
 
-	secret string
-	url    string
+	id  string
+	key string
+	url string
 }
 
-// New returns a new Webhook.
+// NewWebhook returns a new Webhook.
 //
-// If url does start with "https://" or "http://", it will be used as uuid
-// and generated based on the default base url.
-//
+// botid is required. but secret is optional.
 // If secret is not empty, enable the signature verification.
-func New(url, secret string) Webhook {
-	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
-		url = DefaultBaseURL + url
-	}
-	return Webhook{url: url, secret: secret}.WithSender(http.DefaultClient.Do)
+func NewWebhook(botid, secret string) Webhook {
+	return Webhook{}.WithBot(botid, secret).WithSender(http.DefaultClient.Do)
 }
 
 // WithSender returns a new Webhook with the http sender.
+//
+// Default: http.DefaultClient.Do
 func (w Webhook) WithSender(do func(*http.Request) (*http.Response, error)) Webhook {
+	if do == nil {
+		panic("Webhook.WithSender: do is nil")
+	}
+
 	w.do = do
+	return w
+}
+
+// WithURL returns a new Webhook with the bot id and secret.
+//
+// botid is required. but secret is optional.
+// If secret is not empty, enable the signature verification.
+func (w Webhook) WithBot(botid, secret string) Webhook {
+	if botid == "" {
+		panic("Webhook.WithBot: botid is empty")
+	}
+
+	w.id = botid
+	w.key = secret
+	w.url = webhookBaseURL + botid
 	return w
 }
 
@@ -187,12 +201,12 @@ func (w Webhook) send(ctx context.Context, msgtype string, content any) (err err
 }
 
 func (w Webhook) getsign() (sign, timestamp string) {
-	if w.secret == "" {
+	if w.key == "" {
 		return
 	}
 
 	timestamp = strconv.FormatInt(time.Now().Unix(), 10)
-	signedstr := fmt.Sprintf("%v\n%s", timestamp, w.secret)
+	signedstr := fmt.Sprintf("%v\n%s", timestamp, w.key)
 	hmac := hmac.New(sha256.New, unsafex.Bytes(signedstr))
 	sign = base64.StdEncoding.EncodeToString(hmac.Sum(nil))
 	return

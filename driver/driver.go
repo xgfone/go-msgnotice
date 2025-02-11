@@ -32,7 +32,7 @@ type Message struct {
 	Metadata map[string]any
 }
 
-// NewMessage returns a message witht the given information.
+// NewMessage returns a message with the given information.
 func NewMessage(mtype, receiver, title, content string, metadata map[string]any) Message {
 	return Message{
 		Type:     mtype,
