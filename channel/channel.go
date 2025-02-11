@@ -60,14 +60,14 @@ type Sender func(ctx context.Context, channelName string, msg driver.Message) er
 type Channel struct {
 	ChannelName string
 	DriverName  string
-	DriverConf  map[string]interface{}
+	DriverConf  map[string]any
 	IsDefault   bool
 
 	driver.Driver `json:"-" yaml:"-" sql:"-" xml:"-"`
 }
 
 // New returns a new channel.
-func New(channelName, driverName string, driverConf map[string]interface{}) (Channel, error) {
+func New(channelName, driverName string, driverConf map[string]any) (Channel, error) {
 	return (Channel{
 		ChannelName: channelName,
 		DriverName:  driverName,
@@ -76,7 +76,7 @@ func New(channelName, driverName string, driverConf map[string]interface{}) (Cha
 }
 
 // Must is the same as New, but panics if there is an error.
-func Must(channelName, driverName string, driverConf map[string]interface{}) Channel {
+func Must(channelName, driverName string, driverConf map[string]any) Channel {
 	channel, err := New(channelName, driverName, driverConf)
 	if err != nil {
 		panic(err)

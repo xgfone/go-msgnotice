@@ -69,7 +69,7 @@ func Gets() []Builder {
 }
 
 // Build looks up the builder by the name and build the driver with the config.
-func Build(name string, config map[string]interface{}) (driver driver.Driver, err error) {
+func Build(name string, config map[string]any) (driver driver.Driver, err error) {
 	if builder := Get(name); builder != nil {
 		driver, err = builder.Build(config)
 	} else {

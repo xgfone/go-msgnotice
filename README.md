@@ -53,7 +53,7 @@ func newDriverMiddleware(_name, _type string, _prio int) middleware.Middleware {
 	})
 }
 
-func _loadFromFile(filepath string, dst interface{}, cb func() error) (err error) {
+func _loadFromFile(filepath string, dst any, cb func() error) (err error) {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -138,7 +138,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		Title    string
 		Content  string
 		Receiver string
-		Metadata map[string]interface{}
+		Metadata map[string]any
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -191,31 +191,31 @@ func main() {
 ```json
 // Templates configuration file: templates.json
 [
-    {
-        "Name": "hello",
-        "Tmpl": "Hello {name}",
-        "Args": ["name"]
-    }
+  {
+    "Name": "hello",
+    "Tmpl": "Hello {name}",
+    "Args": ["name"]
+  }
 ]
 ```
 
 ```json
 // Channels configuration file: channels.json
 [
-    {
-        "ChannelName": "stdout",
-        "DriverName": "stdout"
-    },
-    {
-        "ChannelName": "email",
-        "DriverName": "email",
-        "DriverConf": {
-            "addr": "mail.domain.com:25",
-            "from": "username@domain.com",
-            "username": "username@domain.com",
-            "password": "password"
-        }
+  {
+    "ChannelName": "stdout",
+    "DriverName": "stdout"
+  },
+  {
+    "ChannelName": "email",
+    "DriverName": "email",
+    "DriverConf": {
+      "addr": "mail.domain.com:25",
+      "from": "username@domain.com",
+      "username": "username@domain.com",
+      "password": "password"
     }
+  }
 ]
 ```
 

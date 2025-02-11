@@ -26,7 +26,7 @@ import (
 func init() { builder.NewAndRegister("stdout", New) }
 
 // New returns a new driver, which outputs the message to stdout.
-func New(_ map[string]interface{}) (driver.Driver, error) {
+func New(_ map[string]any) (driver.Driver, error) {
 	return driver.New("stdout", func(c context.Context, m driver.Message) error {
 		fmt.Printf("title=%s, content=%s, receiver=%s, metadata=%v\n",
 			m.Title, m.Content, m.Receiver, m.Metadata)

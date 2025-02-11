@@ -78,7 +78,7 @@ func (d *driverImpl) Send(c context.Context, m driver.Message) (err error) {
 }
 
 func (d *driverImpl) render(c context.Context, name string,
-	metadata map[string]interface{}) (content string, err error) {
+	metadata map[string]any) (content string, err error) {
 	if name == "" {
 		return "", Error{}
 	}

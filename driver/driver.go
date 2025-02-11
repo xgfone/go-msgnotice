@@ -29,11 +29,11 @@ type Message struct {
 	Title    string
 	Content  string
 	Receiver string
-	Metadata map[string]interface{}
+	Metadata map[string]any
 }
 
 // NewMessage returns a message witht the given information.
-func NewMessage(mtype, receiver, title, content string, metadata map[string]interface{}) Message {
+func NewMessage(mtype, receiver, title, content string, metadata map[string]any) Message {
 	return Message{
 		Type:     mtype,
 		Title:    title,

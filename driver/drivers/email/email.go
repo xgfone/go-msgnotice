@@ -53,7 +53,7 @@ func init() { builder.NewAndRegister(DriverType, New) }
 // If addr does not contain the port, use 465 if forcetls is true else 25.
 //
 // Notice: The returned driver supports the comma-separated receiver list.
-func New(config map[string]interface{}) (driver.Driver, error) {
+func New(config map[string]any) (driver.Driver, error) {
 	addr, _ := config["addr"].(string)
 	from, _ := config["from"].(string)
 	username, _ := config["username"].(string)

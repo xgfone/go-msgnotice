@@ -31,7 +31,7 @@ var Default = NewManager()
 func init() { channel.Send = Default.SendWithChannel }
 
 // NewChannelFunc is a function to new a channel from the config.
-type NewChannelFunc func(channelName, driverName string, driverConf map[string]interface{}) (*channel.Channel, error)
+type NewChannelFunc func(channelName, driverName string, driverConf map[string]any) (*channel.Channel, error)
 
 // Manager is used to manage a group of channels.
 type Manager struct {
