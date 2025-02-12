@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,10 +28,18 @@ import (
 	"github.com/knadh/smtppool"
 	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/builder"
+	"github.com/xgfone/go-msgnotice/tools/email"
+	"github.com/xgfone/go-toolkit/unsafex"
 )
 
 // DriverType represents the driver type "email".
 const DriverType = "email"
+
+// DecodeMessageContent is used to decode the content of the email message.
+var DecodeMessageContent = email.DecodeMessage
+
+// Message is the alias of email.Message.
+type Message = email.Message
 
 func init() { builder.NewAndRegister(DriverType, New) }
 
@@ -53,7 +61,7 @@ func init() { builder.NewAndRegister(DriverType, New) }
 // If addr does not contain the port, use 465 if forcetls is true else 25.
 //
 // Notice: The returned driver supports the comma-separated receiver list.
-func New(config map[string]any) (driver.Driver, error) {
+func New(name string, config map[string]any) (driver.Driver, error) {
 	addr, _ := config["addr"].(string)
 	from, _ := config["from"].(string)
 	username, _ := config["username"].(string)
@@ -204,24 +212,29 @@ func New(config map[string]any) (driver.Driver, error) {
 		return nil, err
 	}
 
-	return driverImpl{from: from, pool: pool}, nil
+	return driverImpl{name: name, from: from, pool: pool}, nil
 }
 
 type driverImpl struct {
 	pool *smtppool.Pool
 	from string
+	name string
 }
 
+func (d driverImpl) Stop()        { d.pool.Close() }
+func (d driverImpl) Name() string { return d.name }
 func (d driverImpl) Type() string { return DriverType }
+func (d driverImpl) Send(c context.Context, m driver.Message) (err error) {
+	subject, content, err := DecodeMessageContent(m.Content)
+	if err != nil {
+		return
+	}
 
-func (d driverImpl) Stop() { d.pool.Close() }
-
-func (d driverImpl) Send(c context.Context, m driver.Message) error {
 	var mail smtppool.Email
 	mail.From = d.from
 	mail.To = strings.Split(m.Receiver, ",")
-	mail.Subject = m.Title
-	mail.HTML = []byte(m.Content)
+	mail.Subject = subject
+	mail.HTML = unsafex.Bytes(content)
 	return d.pool.Send(mail)
 }
 

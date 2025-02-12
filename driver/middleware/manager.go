@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,22 +14,36 @@
 
 package middleware
 
-import "github.com/xgfone/go-msgnotice/driver"
+import (
+	"fmt"
+
+	"github.com/xgfone/go-msgnotice/driver"
+)
+
+var _ Middleware = DefaultManager
 
 // DefaultManager is the default global middleware manager.
-var DefaultManager = NewManager()
+var DefaultManager = NewManager("default")
 
 // Manager is used to manage a group of the driver middlewares
 type Manager struct {
+	name string
 	mdws Middlewares
 }
 
-// NewManager returns a new middleware manager.
-func NewManager() *Manager { return new(Manager) }
+// NewManager returns a new middleware manager with the name.
+func NewManager(name string) *Manager {
+	return &Manager{name: name}
+}
 
-// Clone clones itself and returns a new one.
-func (m *Manager) Clone() *Manager {
-	return NewManager().Use(m.mdws...)
+// Name returns the name of the manager.
+func (m *Manager) Name() string {
+	return m.name
+}
+
+// String implements the interface fmt.Stringer.
+func (m *Manager) String() string {
+	return fmt.Sprintf("Manager(name=%s)", m.name)
 }
 
 // Use appends the new middlewares.
@@ -54,4 +68,12 @@ func (m *Manager) Driver(d driver.Driver) driver.Driver {
 	return m.mdws.Driver(d)
 }
 
-var _ Middleware = DefaultManager
+// Priority returns the highest priority of all the middlewares.
+func (m *Manager) Priority() (priority int) {
+	for _, mw := range m.mdws {
+		if p := getprio(mw); p > priority {
+			priority = p
+		}
+	}
+	return
+}

@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,21 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package nothing provides a driver to do nothing.
-package nothing
-
-import (
-	"context"
-
-	"github.com/xgfone/go-msgnotice/driver"
-	"github.com/xgfone/go-msgnotice/driver/builder"
-)
-
-func init() { builder.NewAndRegister("nothing", New) }
-
-// New returns a new driver, which outputs the message to stdout.
-func New(name string, _ map[string]any) (driver.Driver, error) {
-	return driver.New(name, "nothing", func(c context.Context, m driver.Message) error {
-		return nil
-	}, nil), nil
-}
+// Package feishu provides a driver to send the message to feishu.
+package feishu

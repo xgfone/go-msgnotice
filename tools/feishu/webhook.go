@@ -79,9 +79,9 @@ func (w Webhook) WithBot(botid, secret string) Webhook {
 
 // SendText sends a plain text message.
 //
-// @all: <at user_id="all">All<at>
+// @all: <at user_id="all">All</at>
 //
-// @single_user: <at user_id="open_id or user_id">Name<at>
+// @single_user: <at user_id="open_id or user_id">Name</at>
 //
 // See https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot#756b882f
 func (w Webhook) SendText(ctx context.Context, text string) (err error) {

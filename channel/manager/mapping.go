@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,17 @@ package manager
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"maps"
 	"sync"
 	"sync/atomic"
 
 	"github.com/xgfone/go-msgnotice/driver"
 )
 
-// DefaultChannels is the global default channels.
-var DefaultChannels = NewMapping()
+// DefaultMapping is the default mapping from driver type to channel name.
+var DefaultMapping = NewMapping()
 
 // Mapping is used to manage the mapping from the driver type to the channel name.
 type Mapping struct {
@@ -32,7 +35,7 @@ type Mapping struct {
 	t2ns atomic.Value
 }
 
-// NewMapping returns a new default channel manager.
+// NewMapping returns a new Mapping.
 func NewMapping() *Mapping {
 	m := &Mapping{t2nm: make(map[string]string, 8)}
 	m.updateMapping()
@@ -69,16 +72,19 @@ func (m *Mapping) unset(driverType string) (ok bool) {
 // Set sets the mapping from the driver type to the channel name.
 func (m *Mapping) Set(driverType, channelName string) {
 	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if m.set(driverType, channelName) {
 		m.updateMapping()
 	}
-	m.lock.Unlock()
 }
 
 // Sets sets a set of the mappings from the driver type to the channel name.
 func (m *Mapping) Sets(driverType2channelNames map[string]string) {
-	var changed bool
 	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	var changed bool
 	for driverType, channelName := range driverType2channelNames {
 		if m.set(driverType, channelName) {
 			changed = true
@@ -88,22 +94,24 @@ func (m *Mapping) Sets(driverType2channelNames map[string]string) {
 	if changed {
 		m.updateMapping()
 	}
-	m.lock.Unlock()
 }
 
 // Unset unsets the mapping from the driver type to the channel name.
 func (m *Mapping) Unset(driverType string) {
 	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if m.unset(driverType) {
 		m.updateMapping()
 	}
-	m.lock.Unlock()
 }
 
 // Unsets unsets a set of the mappings from the driver type to the channel name.
 func (m *Mapping) Unsets(driverTypes ...string) {
-	var changed bool
 	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	var changed bool
 	for _, driverType := range driverTypes {
 		if m.unset(driverType) {
 			changed = true
@@ -113,7 +121,6 @@ func (m *Mapping) Unsets(driverTypes ...string) {
 	if changed {
 		m.updateMapping()
 	}
-	m.lock.Unlock()
 }
 
 // Get returns the channel name mapped by the driver type.
@@ -123,20 +130,18 @@ func (m *Mapping) Get(driverType string) string {
 
 // GetAll returns all the mappings from the driver type to the channel name.
 func (m *Mapping) GetAll() (driverType2ChannelNames map[string]string) {
-	mappings := m.getMapping()
-	driverType2ChannelNames = make(map[string]string, len(mappings))
-	for k, v := range mappings {
-		driverType2ChannelNames[k] = v
-	}
-	return
+	return maps.Clone(m.getMapping())
 }
 
-// GetDefaultChannelName returns the channel name mapped by the driver type.
-//
-// NOTICE: the message type is used as the driver type if not empty.
-func (m *Mapping) GetDefaultChannelName(c context.Context, dm driver.Message) (string, error) {
-	if len(dm.Type) > 0 {
-		return m.Get(dm.Type), nil
+// GetFromMessage returns the channel name mapped by the message type.
+func (m *Mapping) GetFromMessage(ctx context.Context, msg driver.Message) (string, error) {
+	if msg.Type == "" {
+		return "", errors.New("missing the channel name or driver type")
 	}
-	return "", nil
+
+	if name := m.Get(msg.Type); name != "" {
+		return name, nil
+	}
+
+	return "", fmt.Errorf("not found channel name for the driver type '%s'", msg.Type)
 }

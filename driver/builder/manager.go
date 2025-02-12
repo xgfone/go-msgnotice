@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,13 +16,12 @@ package builder
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/xgfone/go-msgnotice/driver"
+	"github.com/xgfone/go-toolkit/mapx"
 )
 
 var (
-	block    = new(sync.RWMutex)
 	builders = make(map[string]Builder, 16)
 )
 
@@ -35,37 +34,24 @@ func NewAndRegister(name string, build BuilderFunc) {
 //
 // If the builder has been registered, override it.
 func Register(builder Builder) {
-	block.Lock()
-	defer block.Unlock()
 	builders[builder.Name()] = builder
 }
 
 // Unregister unregisters the driver builder by the name.
 func Unregister(name string) {
-	block.Lock()
 	delete(builders, name)
-	block.Unlock()
 }
 
 // Get returns the driver builder by the name.
 //
 // Return nil if the builder does not exist.
 func Get(name string) Builder {
-	block.RLock()
-	builder := builders[name]
-	block.RUnlock()
-	return builder
+	return builders[name]
 }
 
 // Gets returns all the driver builders.
 func Gets() []Builder {
-	block.RLock()
-	_builders := make([]Builder, 0, len(builders))
-	for _, builder := range builders {
-		_builders = append(_builders, builder)
-	}
-	block.RUnlock()
-	return _builders
+	return mapx.Values(builders)
 }
 
 // Build looks up the builder by the name and build the driver with the config.

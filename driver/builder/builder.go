@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ type Builder interface {
 }
 
 // BuilderFunc is a function to new a driver.
-type BuilderFunc func(map[string]any) (driver.Driver, error)
+type BuilderFunc func(name string, config map[string]any) (driver.Driver, error)
 
 // New returns a new driver builder.
 func New(name string, build BuilderFunc) Builder {
@@ -37,4 +37,4 @@ type builder struct {
 }
 
 func (b builder) Name() string                                  { return b.name }
-func (b builder) Build(c map[string]any) (driver.Driver, error) { return b.build(c) }
+func (b builder) Build(c map[string]any) (driver.Driver, error) { return b.build(b.name, c) }

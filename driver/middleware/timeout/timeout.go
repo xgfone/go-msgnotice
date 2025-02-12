@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,13 +24,13 @@ import (
 )
 
 // New returns a new timeout middleware to set the context timeout.
-func New(priority int, driverType string, timeout time.Duration) middleware.Middleware {
+func New(priority int, timeout time.Duration, matcher driver.Matcher) middleware.Middleware {
 	if timeout <= 0 {
 		panic("the timeout must be a positive")
 	}
 
-	return middleware.New("timeout", priority, func(d driver.Driver) driver.Driver {
-		return driver.MatchAndWrap(driverType, d, func(c context.Context, m driver.Message, d driver.Driver) error {
+	return middleware.NewWithMatch("timeout", priority, matcher, func(d driver.Driver) driver.Driver {
+		return driver.Wrap(d, func(c context.Context, m driver.Message, d driver.Driver) error {
 			c, cancel := context.WithTimeout(c, timeout)
 			defer cancel()
 			return d.Send(c, m)

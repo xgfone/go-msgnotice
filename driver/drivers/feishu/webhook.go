@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package feishu provides a driver to send the message to feishu.
 package feishu
 
 import (
@@ -22,38 +21,89 @@ import (
 	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/builder"
 	"github.com/xgfone/go-msgnotice/tools/feishu"
+	"github.com/xgfone/go-toolkit/mapx"
 )
 
 // DriverTypeWebhook represents the driver type "feishu.webhook".
 const DriverTypeWebhook = "feishu.webhook"
 
-func init() { builder.NewAndRegister(DriverTypeWebhook, NewWebhook) }
+func init() { builder.NewAndRegister(DriverTypeWebhook, buildWebhook) }
 
-// NewWebhook returns a new driver, which sends the message to feishu.
-//
-// The optional secret is extracted from the message metadata by name "secret".
-func NewWebhook(config map[string]any) (driver.Driver, error) {
+func buildWebhook(name string, config map[string]any) (driver.Driver, error) {
 	var secrets map[string]string
-	if _config := config["secrets"]; _config != nil {
-		_secrets, ok := _config.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("secrets is %T, not map[string]any", config["secrets"])
-		}
+	switch _secrets := config["Secrets"].(type) {
+	case nil:
+	case map[string]any:
+		secrets = mapx.Convert(_secrets, func(k string, v any) (string, string) { return k, v.(string) })
 
-		secrets = make(map[string]string, len(_secrets))
-		for k, v := range _secrets {
-			var ok bool
-			if secrets[k], ok = v.(string); !ok {
-				return nil, fmt.Errorf("secret of '%s' is %T, not string", k, v)
-			}
-		}
+	default:
+		return nil, fmt.Errorf("expect Secrets is a map[string]any, but got %T", _secrets)
 	}
 
-	return driver.New(DriverTypeWebhook, func(c context.Context, m driver.Message) error {
-		secret, ok := m.Metadata["secret"].(string)
-		if !ok {
-			secret = secrets[m.Receiver]
+	return NewWebhook(name).WithLookup(func(receiver string) (string, error) {
+		return secrets[receiver], nil
+	}), nil
+}
+
+/// ---------------------------------------------------------------------- ///
+
+func noop(string) (string, error) { return "", nil }
+
+var _ driver.Driver = Webhook{}
+
+// Webhook is a driver to send the message to feishu by webhook.
+type Webhook struct {
+	lookup func(receiver string) (secret string, err error)
+	name   string
+}
+
+// NewWebhook returns a new driver based on feishu webhook.
+func NewWebhook(name string) Webhook {
+	return Webhook{name: name}.WithLookup(noop)
+}
+
+// WithLookup returns a new feishu webhook driver with the secret lookup function.
+func (w Webhook) WithLookup(f func(receiver string) (secret string, err error)) Webhook {
+	if f == nil {
+		panic("driver.feishu.Webhook: the secret lookup function is nil")
+	}
+
+	w.lookup = f
+	return w
+}
+
+// Send implements the interface driver.Driver#Stop.
+func (w Webhook) Stop() {}
+
+// Name implements the interface driver.Driver#Name.
+func (w Webhook) Name() string { return w.name }
+
+// Type implements the interface driver.Driver#Type.
+func (w Webhook) Type() string { return DriverTypeWebhook }
+
+// Send implements the interface driver.Driver#Send.
+func (w Webhook) Send(c context.Context, m driver.Message) (err error) {
+	secret, err := w.lookup(m.Receiver)
+	if err != nil {
+		return err
+	}
+
+	webhook := feishu.NewWebhook(m.Receiver, secret)
+	msgtype, _ := m.Metadata["MsgType"].(string)
+	switch msgtype {
+	case "", "text":
+		if content, ok := m.Content.(string); ok {
+			err = webhook.SendText(c, content)
+		} else {
+			err = fmt.Errorf("expect the content is a string, but got %T", m.Content)
 		}
-		return feishu.NewWebhook(m.Receiver, secret).SendText(c, m.Content)
-	}, nil), nil
+
+	case "post":
+		err = webhook.SendRich(c, m.Content)
+
+	default:
+		err = fmt.Errorf("driver.feishu.webhook: unkown msg type '%s'", msgtype)
+	}
+
+	return
 }

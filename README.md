@@ -16,42 +16,27 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
 	// Load and register the drivers.
 	_ "github.com/xgfone/go-msgnotice/driver/drivers/email"
-	_ "github.com/xgfone/go-msgnotice/driver/drivers/stdout" // For test
+	_ "github.com/xgfone/go-msgnotice/driver/drivers/feishu"
 
 	"github.com/xgfone/go-msgnotice/channel"
 	"github.com/xgfone/go-msgnotice/channel/manager"
 	"github.com/xgfone/go-msgnotice/driver"
+	"github.com/xgfone/go-msgnotice/driver/builder"
 	"github.com/xgfone/go-msgnotice/driver/middleware"
 	"github.com/xgfone/go-msgnotice/driver/middleware/logger"
-	"github.com/xgfone/go-msgnotice/driver/middleware/template"
+	"github.com/xgfone/go-msgnotice/driver/middleware/timeout"
 )
 
 var (
-	listenaddr    = flag.String("listenaddr", "127.0.0.1:80", "The address to listen on.")
-	channelsfile  = flag.String("channelsfile", "channels.json", "The file path storing the channels.")
-	templatesfile = flag.String("templatesfile", "templates.json", "The file path storing the templates.")
+	listenaddr   = flag.String("listenaddr", "127.0.0.1:80", "The address to listen on.")
+	channelsfile = flag.String("channelsfile", "channels.json", "The file path storing the channels.")
 )
-
-func wrapDriver(_name, _type string, _driver driver.Driver) driver.Driver {
-	return driver.MatchAndWrap(_type, _driver, func(c context.Context, m driver.Message, d driver.Driver) error {
-		log.Printf("middleware=%s, type=%s, title=%s, content=%s, receiver=%s",
-			_name, _type, m.Title, m.Content, m.Receiver)
-		return _driver.Send(c, m)
-	})
-}
-
-func newDriverMiddleware(_name, _type string, _prio int) middleware.Middleware {
-	return middleware.New(_name, _prio, func(d driver.Driver) driver.Driver {
-		return wrapDriver(_name, _type, d)
-	})
-}
 
 func _loadFromFile(filepath string, dst any, cb func() error) (err error) {
 	data, err := os.ReadFile(filepath)
@@ -71,58 +56,42 @@ func _loadFromFile(filepath string, dst any, cb func() error) (err error) {
 	return cb()
 }
 
-func initDriverMiddlewares() (err error) {
-	var templates []template.Template
-	err = _loadFromFile(*templatesfile, &templates, func() error {
-		for _, tmpl := range templates {
-			if tmpl.Name == "" || tmpl.Tmpl == "" {
-				return errors.New("template misses the name or content")
+func initChannels() {
+	type Channel struct {
+		ChannelName string
+		DriverName  string
+		DriverConf  map[string]any
+	}
+
+	var channels []Channel
+	var _channels []channel.Channel
+	err := _loadFromFile(*channelsfile, &channels, func() (err error) {
+		for _, c := range channels {
+			if c.ChannelName == "" || c.DriverName == "" {
+				return errors.New("missing the channel or driver name")
 			}
+
+			driver, err := builder.Build(c.DriverName, c.DriverConf)
+			if err != nil {
+				return err
+			}
+
+			_channels = append(_channels, channel.New(c.ChannelName, driver))
 		}
-		return nil
+		return
 	})
+
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
-	getTmpl := func(c context.Context, name string) (t template.Template, ok bool, err error) {
-		for _, tmpl := range templates {
-			if tmpl.Name == name {
-				return tmpl, true, nil
-			}
-		}
-		err = fmt.Errorf("no template named '%s'", name)
-		return
-	}
-
-	// For Common middlewares
-	middleware.DefaultManager.Use(logger.New(0, ""), template.New(10, "", template.GetterFunc(getTmpl)))
-
-	// Only for Email middleware
-	middleware.DefaultManager.Use(newDriverMiddleware("email", "email", 20))
-
-	// Only for Stdout middleware
-	middleware.DefaultManager.Use(newDriverMiddleware("stdout", "stdout", 20))
-
-	return nil
+	manager.Default.UpsertChannels(_channels...)
 }
 
-func initChannels() (err error) {
-	var channels []channel.Channel
-	err = _loadFromFile(*channelsfile, &channels, func() (err error) {
-		for i, channel := range channels {
-			channels[i], err = channel.Init()
-			if err != nil {
-				return
-			}
-		}
-		return
-	})
-
-	if err == nil {
-		manager.Default.UpsertChannels(channels...)
-	}
-	return
+func initMiddlewares() {
+	middleware.DefaultManager.Use(timeout.New(100, time.Second*10, nil))
+	middleware.DefaultManager.Use(logger.New(90, nil))
 }
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
@@ -133,10 +102,8 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Timeout  string
+		Content  any
 		Channel  string
-		Title    string
-		Content  string
 		Receiver string
 		Metadata map[string]any
 	}
@@ -145,26 +112,13 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Channel == "" || req.Title == "" || req.Content == "" || len(req.Receiver) == 0 {
+	if req.Content == nil || req.Channel == "" || req.Receiver == "" {
 		http.Error(w, "missing the required arguments", 400)
 		return
 	}
 
-	ctx := context.Background()
-	if req.Timeout != "" {
-		timeout, err := time.ParseDuration(req.Timeout)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		var cancel func()
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-
-	msg := driver.NewMessage("", req.Receiver, req.Title, req.Content, req.Metadata)
-	err := channel.Send(ctx, req.Channel, msg)
+	msg := driver.NewMessage(req.Channel, "", req.Receiver, req.Content, req.Metadata)
+	err := channel.Send(context.Background(), msg)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -173,15 +127,8 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 
-	if err := initDriverMiddlewares(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if err := initChannels(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	initMiddlewares()
+	initChannels()
 
 	http.HandleFunc("/message", httpHandler)
 	_ = http.ListenAndServe(*listenaddr, nil)
@@ -189,32 +136,22 @@ func main() {
 ```
 
 ```json
-// Templates configuration file: templates.json
-[
-  {
-    "Name": "hello",
-    "Tmpl": "Hello {name}",
-    "Args": ["name"]
-  }
-]
-```
-
-```json
 // Channels configuration file: channels.json
 [
-  {
-    "ChannelName": "stdout",
-    "DriverName": "stdout"
-  },
   {
     "ChannelName": "email",
     "DriverName": "email",
     "DriverConf": {
-      "addr": "mail.domain.com:25",
-      "from": "username@domain.com",
-      "username": "username@domain.com",
-      "password": "password"
+      "addr": "smtp.example.com",
+      "from": "username@example.com",
+      "username": "username@example.com",
+      "password": "password",
+      "forcetls": true
     }
+  },
+  {
+    "ChannelName": "feishu.webhook",
+    "DriverName": "feishu.webhook"
   }
 ]
 ```
@@ -224,10 +161,34 @@ func main() {
 $ msgnotice &
 
 # Client sends the message.
-$ curl http://localhost/message -XPOST -H 'Content-Type: application/json' \
--d '{"Channel":"stdout", "Title":"title", "Content":"content", "Receiver":"someone"}'
-$ curl http://localhost/message -XPOST -H 'Content-Type: application/json' \
--d '{"Channel":"email", "Title":"title", "Content":"content", "Receiver":"someone@mail.com"}'
-$ curl http://localhost/message -XPOST -H 'Content-Type: application/json' \
--d '{"Channel":"email", "Title":"title", "Content":"tmpl:hello", "Metadata":{"name":"xgfone"}, "Receiver":"someone@mail.com"}'
+
+## Send the message by the email
+$ curl http://localhost/message -X POST -H 'content-type: application/json' \
+-d '{"Content": {"Subject": "subject", "Content": "test"}, "Channel": "email", "Receiver": "xiegaofeng@bimoai.com"}'
+
+## Send the general text message to feishu by webhook.
+$ curl http://localhost/message -X POST -H 'content-type: application/json' \
+-d '{"Channel": "feishu.webhook", "Receiver": "9c473cb6-1234-5678-bbf1-147b5e83ab8e", "Content": "<at user_id=\"all\">All</at>"}'
+
+## Send the rich text message to feishu by webhook.
+$ curl http://localhost/message -X POST -H 'content-type: application/json' -d '{
+    "Channel": "feishu.webhook",
+    "Receiver": "9c473cb6-1234-5678-bbf1-147b5e83ab8e",
+    "Metadata": {"MsgType": "post"},
+    "Content": {
+        "zh_cn": {
+            "title": "test",
+            "content": [
+                [
+                    {"tag": "text", "text": "first paragraph"},
+                    {"tag": "at", "user_id": "all"},
+                    {"tag": "a", "text": "URL", "href": "https://www.example.com"}
+                ],
+                [
+                    {"tag": "text", "text": "second paragraph"}
+                ]
+            ]
+        }
+    }
+}'
 ```

@@ -1,4 +1,4 @@
-// Copyright 2022~2024 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,60 +18,75 @@ package driver
 import (
 	"context"
 	"errors"
+	"slices"
 )
 
 // ErrNoDriver is used to represent the error that the driver does not exist.
 var ErrNoDriver = errors.New("no driver")
 
+// DefaultSender is the default sender to send the message.
+var DefaultSender Sender
+
 // Message is the message information.
 type Message struct {
-	Type     string
-	Title    string
-	Content  string
+	Name string // The message or channel name
+	Type string // The message or driver type
+
+	Content  any
 	Receiver string
 	Metadata map[string]any
 }
 
-// NewMessage returns a message with the given information.
-func NewMessage(mtype, receiver, title, content string, metadata map[string]any) Message {
+// NewMessage returns a message.
+func NewMessage(cname, dtype, receiver string, content any, metadata map[string]any) Message {
 	return Message{
-		Type:     mtype,
-		Title:    title,
+		Name: cname,
+		Type: dtype,
+
 		Content:  content,
 		Receiver: receiver,
 		Metadata: metadata,
 	}
 }
 
+// Sender is the interface to send the message.
 type Sender interface {
 	Send(context.Context, Message) error
 }
 
 // Driver is used to send the message to the endpoint.
 type Driver interface {
-	Sender
+	Name() string
 	Type() string
+
+	Sender
 	Stop()
 }
 
-// SendFunc is the driver send function.
-type SendFunc func(c context.Context, m Message) error
+// SenderFunc is the message send function.
+type SenderFunc func(c context.Context, m Message) error
 
 // Send implements the interface Sender.
-func (f SendFunc) Send(c context.Context, m Message) error { return f(c, m) }
+func (f SenderFunc) Send(c context.Context, m Message) error { return f(c, m) }
 
-// Match reports whether the driver matches the driver type or not.
-//
-// If dtype is empty, return true always.
-func Match(driver Driver, dtype string) bool {
-	return dtype == "" || driver.Type() == dtype
+// Matcher is used to check whether to matche the driver or not.
+type Matcher func(Driver) bool
+
+// TypesMatcher returns a driver matcher to report whether the driver is matched against the given types.
+func TypesMatcher(types ...string) Matcher {
+	return func(d Driver) bool {
+		return slices.Contains(types, d.Type())
+	}
 }
 
-// New returns a new driver.
+// New returns a new common driver.
 //
-// If stop is nil, Driver#Stop does nothing.
-func New(_type string, send SendFunc, stop func()) Driver {
-	if _type == "" {
+// If stop is nil, `Driver.Stop` does nothing.
+func New(name, dtype string, send SenderFunc, stop func()) Driver {
+	if name == "" {
+		panic("dirver.New: the driver name must not be empty")
+	}
+	if dtype == "" {
 		panic("dirver.New: the driver type must not be empty")
 	}
 	if send == nil {
@@ -80,16 +95,18 @@ func New(_type string, send SendFunc, stop func()) Driver {
 	if stop == nil {
 		stop = donothing
 	}
-	return &driver{typ: _type, send: send, stop: stop}
+	return &driver{typ: dtype, name: name, send: send, stop: stop}
 }
 
 type driver struct {
 	typ  string
-	send SendFunc
+	name string
+	send SenderFunc
 	stop func()
 }
 
 func (d driver) Type() string                            { return d.typ }
+func (d driver) Name() string                            { return d.name }
 func (d driver) Send(c context.Context, m Message) error { return d.send(c, m) }
 func (d driver) Stop()                                   { d.stop() }
 func donothing()                                         {}
@@ -101,20 +118,6 @@ func Wrap(d Driver, wrap func(context.Context, Message, Driver) error) Driver {
 	}
 	if wrap == nil {
 		panic("driver.Wrap: the wrap function must not be nil")
-	}
-	return &wrappedDriver{wrap: wrap, Driver: d}
-}
-
-// MatchAndWrap is the same as Wrap, but only if matching the given driver type.
-func MatchAndWrap(dtype string, d Driver, wrap func(c context.Context, m Message, d Driver) error) Driver {
-	if d == nil {
-		panic("driver.MatchAndWrap: driver must not be nil")
-	}
-	if wrap == nil {
-		panic("driver.MatchAndWrap: the wrap function must not be nil")
-	}
-	if !Match(d, dtype) {
-		return d
 	}
 	return &wrappedDriver{wrap: wrap, Driver: d}
 }

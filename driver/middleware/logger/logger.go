@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,54 +20,19 @@ import (
 	"log"
 	"time"
 
-	"github.com/xgfone/go-msgnotice/channel"
 	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/middleware"
 )
 
-// Event represents a log message event.
-type Event struct {
-	driver.Message
-	Channel *channel.Channel
-	Start   time.Time
-	Err     error
-}
-
-// LogEvent is used to log the message event.
-//
-// If not set, use the default by using log.Printf.
-var LogEvent func(Event)
-
-func logevent(e Event) {
-	if LogEvent != nil {
-		LogEvent(e)
-	} else {
-		var cname, dname string
-		if e.Channel != nil {
-			cname = e.Channel.ChannelName
-			dname = e.Channel.DriverName
-		}
-
-		log.Printf("channel=%s, driver=%s, title=%s, content=%s, receivers=%s, metadata=%v, start=%d, cost=%s, err=%v",
-			cname, dname, e.Title, e.Content, e.Receiver, e.Metadata, e.Start.Unix(), time.Since(e.Start), e.Err)
-	}
-}
-
 // New returns a new logger middleware to log the sent message.
-func New(priority int, driverType string) middleware.Middleware {
-	return middleware.New("logger", priority, func(d driver.Driver) driver.Driver {
-		return driver.MatchAndWrap(driverType, d, func(c context.Context, m driver.Message, d driver.Driver) error {
+func New(priority int, matcher driver.Matcher) middleware.Middleware {
+	return middleware.NewWithMatch("logger", priority, matcher, func(d driver.Driver) driver.Driver {
+		return driver.Wrap(d, func(c context.Context, m driver.Message, d driver.Driver) (err error) {
 			start := time.Now()
-			err := d.Send(c, m)
-
-			var ch *channel.Channel
-			channel, ok := channel.GetChannelFromContext(c)
-			if ok {
-				ch = &channel
-			}
-
-			logevent(Event{Channel: ch, Message: m, Start: start, Err: err})
-			return err
+			err = d.Send(c, m)
+			log.Printf("channel=%s, driver=%s, receiver=%s, content=%s, metadata=%v, cost=%s, err=%v",
+				m.Name, m.Type, m.Receiver, m.Content, m.Metadata, time.Since(start), err)
+			return
 		})
 	})
 }

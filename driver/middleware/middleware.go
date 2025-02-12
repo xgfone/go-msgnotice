@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package middleware
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/xgfone/go-msgnotice/driver"
 )
@@ -30,26 +30,37 @@ type Middleware interface {
 type middleware struct {
 	name   string
 	prio   int
+	match  driver.Matcher
 	driver func(driver.Driver) driver.Driver
 }
 
-func (m middleware) Name() string                         { return m.name }
-func (m middleware) Priority() int                        { return m.prio }
-func (m middleware) Driver(d driver.Driver) driver.Driver { return m.driver(d) }
+func (m middleware) Name() string  { return m.name }
+func (m middleware) Priority() int { return m.prio }
+func (m middleware) Driver(d driver.Driver) driver.Driver {
+	if m.match == nil || m.match(d) {
+		d = m.driver(d)
+	}
+	return d
+}
 
 func (m middleware) String() string {
 	return fmt.Sprintf("Middleware(name=%s, priority=%d)", m.name, m.prio)
 }
 
-// New returns a new driver middleware with the name and  priority.
+// New returns a new driver middleware with the name and priority.
 func New(name string, prio int, f func(driver.Driver) driver.Driver) Middleware {
 	return middleware{name: name, prio: prio, driver: f}
 }
 
+// NewWithMatch returns a new driver middleware with the name, priority and driver matcher.
+func NewWithMatch(name string, prio int, matcher driver.Matcher, f func(driver.Driver) driver.Driver) Middleware {
+	return middleware{name: name, prio: prio, match: matcher, driver: f}
+}
+
 // Sort sorts a set of middlewares by the priority from high to low.
 func Sort(middlewares []Middleware) {
-	sort.SliceStable(middlewares, func(i, j int) bool {
-		return getprio(middlewares[i]) > getprio(middlewares[j])
+	slices.SortStableFunc(middlewares, func(a, b Middleware) int {
+		return getprio(b) - getprio(a)
 	})
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2022 xgfone
+// Copyright 2022~2025 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,15 +23,13 @@ import (
 	"github.com/xgfone/go-msgnotice/channel"
 	"github.com/xgfone/go-msgnotice/driver"
 	"github.com/xgfone/go-msgnotice/driver/middleware"
+	"github.com/xgfone/go-toolkit/mapx"
 )
 
 // Default is the global default channel manager.
 var Default = NewManager()
 
-func init() { channel.Send = Default.SendWithChannel }
-
-// NewChannelFunc is a function to new a channel from the config.
-type NewChannelFunc func(channelName, driverName string, driverConf map[string]any) (*channel.Channel, error)
+func init() { driver.DefaultSender = Default }
 
 // Manager is used to manage a group of channels.
 type Manager struct {
@@ -40,12 +38,11 @@ type Manager struct {
 	// Default: middleware.DefaultManager.Driver
 	WrapDriver func(driver.Driver) driver.Driver
 
-	// GetDefaultChannelName is used to get the default channel name
-	// if no channel is given, which should returns ("", nil) if not found
-	// the default channel name.
+	// GetChannelName is used to get the channel name by the message
+	// when the message name is empty.
 	//
-	// Default: use DefaultChannels.GetDefaultChannelName
-	GetDefaultChannelName func(context.Context, driver.Message) (string, error)
+	// Default: DefaultMapping.GetFromMessage
+	GetChannelName func(context.Context, driver.Message) (string, error)
 
 	clock    sync.RWMutex
 	chmap    map[string]channel.Channel // for channels
@@ -78,39 +75,41 @@ func (m *Manager) wrap(d driver.Driver) driver.Driver {
 	return middleware.DefaultManager.Driver(d)
 }
 
-func (m *Manager) getDefaultName(ctx context.Context, msg driver.Message) (string, error) {
-	if m.GetDefaultChannelName != nil {
-		return m.GetDefaultChannelName(ctx, msg)
+func (m *Manager) getChannelName(ctx context.Context, msg driver.Message) (string, error) {
+	if m.GetChannelName != nil {
+		return m.GetChannelName(ctx, msg)
 	}
-	return DefaultChannels.GetDefaultChannelName(ctx, msg)
+	return DefaultMapping.GetFromMessage(ctx, msg)
 }
 
 // AddChannel adds the channel with the name.
 //
 // Notice: it will apply the driver middlewares to the channel driver.
-func (m *Manager) AddChannel(ch channel.Channel) (err error) {
+func (m *Manager) AddChannel(ch channel.Channel) (ok bool) {
 	m.clock.Lock()
 	defer m.clock.Unlock()
-	if _, ok := m.chmap[ch.ChannelName]; ok {
-		err = channel.ExistError{Channel: ch.ChannelName}
-	} else {
-		ch.Driver = m.wrap(ch.Driver)
-		m.chmap[ch.ChannelName] = ch
+	if _, ok = m.chmap[ch.Name]; !ok {
+		m.chmap[ch.Name] = channel.New(ch.Name, m.wrap(ch.Driver()))
 		m.updateChannels()
 	}
-
-	return
+	return !ok
 }
 
 // UpsertChannels adds or updates a set of channels.
 //
 // Notice: it will apply the driver middlewares to every channel driver.
 func (m *Manager) UpsertChannels(channels ...channel.Channel) {
+	if len(channels) == 0 {
+		return
+	}
+
 	m.clock.Lock()
 	defer m.clock.Unlock()
 	for _, ch := range channels {
-		ch.Driver = m.wrap(ch.Driver)
-		m.chmap[ch.ChannelName] = ch
+		if oldch, ok := m.chmap[ch.Name]; ok {
+			oldch.Driver().Stop()
+		}
+		m.chmap[ch.Name] = channel.New(ch.Name, m.wrap(ch.Driver()))
 	}
 	m.updateChannels()
 }
@@ -120,11 +119,12 @@ func (m *Manager) UpsertChannels(channels ...channel.Channel) {
 // If the channel does not exist, do nothing.
 func (m *Manager) DelChannel(channelName string) {
 	m.clock.Lock()
-	if _, ok := m.chmap[channelName]; ok {
+	defer m.clock.Unlock()
+	if ch, ok := m.chmap[channelName]; ok {
+		ch.Driver().Stop()
 		delete(m.chmap, channelName)
 		m.updateChannels()
 	}
-	m.clock.Unlock()
 }
 
 // GetChannel returns the channel by the name.
@@ -135,47 +135,30 @@ func (m *Manager) GetChannel(channelName string) (channel.Channel, bool) {
 
 // GetChannels returns all the channels.
 func (m *Manager) GetChannels() []channel.Channel {
-	channels := m.getChannels()
-	_channels := make([]channel.Channel, 0, len(channels))
-	for _, channel := range channels {
-		_channels = append(_channels, channel)
-	}
-	return _channels
+	return mapx.Values(m.getChannels())
 }
 
-// SendWithChannel is a convenient function to look up the channel by the name
-// and send the message with the channel.
-//
-// If channelName is empty, use GetDefaultChannelName to get the default channel.
-// If there is not the channel, return channel.NoChannelError(channelName).
-func (m *Manager) SendWithChannel(ctx context.Context, channelName string, msg driver.Message) (err error) {
-	if channelName == "" {
-		channelName, err = m.getDefaultName(ctx, msg)
+// Send looks up the channel by the message and send the message with the channel.
+func (m *Manager) Send(ctx context.Context, msg driver.Message) (err error) {
+	if msg.Name == "" {
+		msg.Name, err = m.getChannelName(ctx, msg)
 		if err != nil {
 			return err
 		}
 	}
 
-	if ch, ok := m.getChannels()[channelName]; ok {
-		channel.SetChannelIntoContext(ctx, ch)
+	if ch, ok := m.getChannels()[msg.Name]; ok {
 		err = ch.Send(ctx, msg)
 	} else {
-		err = channel.NotExistError{Channel: channelName}
+		err = channel.NotExistError{Channel: msg.Name}
 	}
 
 	return
 }
 
-// Send implements the interface driver.Driver#Send,
-// which is equal to m.SendWithChannel(ctx, "", msg).
-func (m *Manager) Send(ctx context.Context, msg driver.Message) (err error) {
-	return m.SendWithChannel(ctx, "", msg)
-}
-
-// Stop implements the interface driver.Driver#Stop,
-// which stops all the registered channels.
+// Stop stops all the registered channels.
 func (m *Manager) Stop() {
 	for _, channel := range m.GetChannels() {
-		channel.Stop()
+		channel.Driver().Stop()
 	}
 }
