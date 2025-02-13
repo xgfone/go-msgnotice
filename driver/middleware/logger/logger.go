@@ -17,7 +17,8 @@ package logger
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/xgfone/go-msgnotice/driver"
@@ -30,9 +31,30 @@ func New(priority int, matcher driver.Matcher) middleware.Middleware {
 		return driver.Wrap(d, func(c context.Context, m driver.Message, d driver.Driver) (err error) {
 			start := time.Now()
 			err = d.Send(c, m)
-			log.Printf("channel=%s, driver=%s, receiver=%s, content=%s, metadata=%v, cost=%s, err=%v",
-				m.Name, m.Type, m.Receiver, m.Content, m.Metadata, time.Since(start), err)
+
+			_args := getargs()
+			defer putargs(_args)
+			args := _args.Args[:0]
+
+			args = append(args, slog.String("channel", m.Name), slog.String("driver", m.Type))
+			args = append(args, slog.String("receiver", m.Receiver), slog.Any("content", m.Content))
+			args = append(args, slog.Any("metadata", m.Metadata), slog.Duration("cost", time.Since(start)))
+
+			if err != nil {
+				args = append(args, slog.Any("err", err))
+				slog.Error("fail to send message notice", args...)
+			} else {
+				slog.Info("successfully send message notice", args...)
+			}
+
 			return
 		})
 	})
 }
+
+type _Args struct{ Args []any }
+
+func putargs(a *_Args) { argspool.Put(a) }
+func getargs() *_Args  { return argspool.Get().(*_Args) }
+
+var argspool = sync.Pool{New: func() any { return &_Args{Args: make([]any, 0, 8)} }}
