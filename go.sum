@@ -1,4 +1,4 @@
 github.com/knadh/smtppool v1.3.0 h1:7Zcn1K7C83/rhGbetistO13yehTKe7YdRiK8PrMsIhE=
 github.com/knadh/smtppool v1.3.0/go.mod h1:3DJHouXAgPDBz0kC50HukOsdapYSwIEfJGwuip46oCA=
-github.com/xgfone/go-toolkit v0.6.0 h1:cGfgAVwYqKPLB+SmZ2Q7bo9YtXhXwfNlW+KKNNbE6Kg=
-github.com/xgfone/go-toolkit v0.6.0/go.mod h1:eOWnIK/acAJOoqEOtWnvuY0Pbn6cZ0DP/Oeoyn17QHw=
+github.com/xgfone/go-toolkit v0.8.0 h1:slJuxVSe5WafWq8Mau5xIPdAIzea4ovP/hrlKRY6gGw=
+github.com/xgfone/go-toolkit v0.8.0/go.mod h1:eOWnIK/acAJOoqEOtWnvuY0Pbn6cZ0DP/Oeoyn17QHw=

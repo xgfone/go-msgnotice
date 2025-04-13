@@ -167,7 +167,7 @@ func (w Webhook) send(ctx context.Context, msgtype string, content any) (err err
 
 	buf := getbuffer()
 	defer putbuffer(buf)
-	if err = jsonx.Marshal(buf, req); err != nil {
+	if err = jsonx.MarshalWriter(buf, req); err != nil {
 		return fmt.Errorf("fail to encode message by json: %w", err)
 	}
 
@@ -189,7 +189,7 @@ func (w Webhook) send(ctx context.Context, msgtype string, content any) (err err
 	}
 
 	var resp Response
-	if err = jsonx.Unmarshal(&resp, bytes.NewReader(data)); err != nil {
+	if err = jsonx.UnmarshalReader(&resp, bytes.NewReader(data)); err != nil {
 		return fmt.Errorf("fail to decode the response body by json: data=%s, err=%w", unsafex.String(data), err)
 	}
 

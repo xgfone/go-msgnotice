@@ -59,12 +59,12 @@ func DecodeMessage(msgContent any) (subject, content string, err error) {
 
 	case []byte:
 		var m Message
-		err = jsonx.Unmarshal(&m, bytes.NewReader(v))
+		err = jsonx.UnmarshalReader(&m, bytes.NewReader(v))
 		subject, content = m.Subject, m.Content
 
 	case json.RawMessage:
 		var m Message
-		err = jsonx.Unmarshal(&m, bytes.NewReader(v))
+		err = jsonx.UnmarshalReader(&m, bytes.NewReader(v))
 		subject, content = m.Subject, m.Content
 
 	default:
